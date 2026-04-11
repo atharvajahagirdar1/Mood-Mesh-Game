@@ -32,7 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const Divider(height: 1),
                         _buildToggle('Music', Icons.music_note_rounded, GameSettings.musicOn, (val) => setState(() => GameSettings.musicOn = val)),
                         const Divider(height: 1),
-                        _buildToggle('Haptics (Vibration)', Icons.vibration_rounded, GameSettings.hapticsOn, (val) => setState(() => GameSettings.hapticsOn = val)),
+                        _buildToggle('Haptics', Icons.vibration_rounded, GameSettings.hapticsOn, (val) => setState(() => GameSettings.hapticsOn = val)),
                       ],
                     ),
                   ),
@@ -50,11 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       leading: Icon(icon, color: AppTheme.primary, size: 28),
       title: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textDark)),
-      trailing: Switch(
-        value: value,
-        activeColor: AppTheme.primary,
-        onChanged: onChanged,
-      ),
+      trailing: Switch(value: value, activeColor: AppTheme.primary, onChanged: onChanged),
     );
   }
 }

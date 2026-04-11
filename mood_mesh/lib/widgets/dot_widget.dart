@@ -28,7 +28,7 @@ class DotWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedScale(
-      scale: isInPath ? 0.85 : (isHighlighted ? 1.1 : 1.0),
+      scale: isInPath ? 0.85 : 1.0,
       duration: const Duration(milliseconds: 150),
       curve: Curves.easeOutBack,
       child: AnimatedContainer(
@@ -36,9 +36,7 @@ class DotWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: moodColor,
           shape: BoxShape.circle,
-          border: isLast 
-              ? Border.all(color: Colors.white, width: 5) 
-              : null,
+          border: isLast ? Border.all(color: Colors.white, width: 5) : Border.all(color: Colors.black.withOpacity(0.05), width: 1),
           boxShadow: isInPath ? [] : const [
             BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 4)),
             BoxShadow(color: Colors.white30, blurRadius: 2, offset: Offset(0, -2)) 

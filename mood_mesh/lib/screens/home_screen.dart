@@ -17,6 +17,31 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  void _playDailyPuzzle() {
+    String today = DateTime.now().toIso8601String().split('T')[0];
+    
+    if (GameSettings.lastDailyPuzzleDate == today) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text('🌟 All Done!', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.primary, fontSize: 26)),
+          content: const Text(
+            'You have already conquered today\'s daily puzzle.\n\nCome back tomorrow for a brand new challenge!', 
+            textAlign: TextAlign.center, 
+            style: TextStyle(fontSize: 18, color: AppTheme.textDark, fontWeight: FontWeight.w600)
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            GameButton(title: 'GOT IT', color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, isSmall: true, onTap: () => Navigator.pop(context))
+          ],
+        )
+      );
+    } else {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => GameScreen(level: LevelData.dailyLevel, isDaily: true))).then((_) => setState(() {})); 
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     int currentLevel = LevelData.maxUnlockedLevel;
@@ -28,46 +53,39 @@ class _HomeScreenState extends State<HomeScreen> {
           SafeArea(
             child: Stack(
               children: [
-                // Top Action Bar
                 Positioned(
                   top: 20, right: 20, left: 20,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _buildIconButton(Icons.palette_rounded, AppTheme.secondary, () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ThemesScreen())).then((_) {
-                          setState(() {}); 
-                        });
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ThemesScreen())).then((_) => setState(() {}));
                       }),
                       
-                      // Central Score Tab (Coin Counter)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
                           color: AppTheme.white,
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
+                          border: Border.all(color: const Color(0xFFE5E9F0), width: 2),
                         ),
                         child: Row(
                           children: [
                             const Icon(Icons.monetization_on_rounded, color: AppTheme.coinGold, size: 28),
                             const SizedBox(width: 8),
-                            Text(
-                              '${GameSettings.totalCoins}', 
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppTheme.textDark)
-                            ),
+                            Text('${GameSettings.totalCoins}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
                           ],
                         ),
                       ),
 
                       _buildIconButton(Icons.settings_rounded, AppTheme.textLight, () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())).then((_) => setState(() {}));
                       }),
                     ],
                   ),
                 ),
                 
-                // Main Content
                 Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -75,42 +93,33 @@ class _HomeScreenState extends State<HomeScreen> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.5),
+                          color: AppTheme.white,
                           shape: BoxShape.circle,
+                          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 15, offset: Offset(0, 10))],
                         ),
                         child: Text(GameSettings.getEmoji(0), style: const TextStyle(fontSize: 120)),
                       ),
-                      const SizedBox(height: 10),
-                      const Text('Mood Mesh', style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
+                      const SizedBox(height: 20),
+                      const Text('Mood Mesh', style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: AppTheme.textDark, letterSpacing: -1.0)),
                       const SizedBox(height: 60),
                       
-                      // Main Play Button
                       GameButton(
                         title: 'PLAY LEVEL $currentLevel',
                         icon: Icons.play_arrow_rounded,
                         color: AppTheme.primary,
                         shadowColor: AppTheme.primaryDark,
                         onTap: () {
-                          Navigator.push(
-                            context, 
-                            MaterialPageRoute(builder: (_) => const LevelSelectScreen())
-                          ).then((_) => setState(() {})); 
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelSelectScreen())).then((_) => setState(() {})); 
                         },
                       ),
                       const SizedBox(height: 20),
                       
-                      // Daily Puzzle Button
                       GameButton(
                         title: 'DAILY PUZZLE',
                         icon: Icons.calendar_month_rounded,
                         color: AppTheme.accent,
                         shadowColor: AppTheme.accentDark,
-                        onTap: () {
-                          Navigator.push(
-                            context, 
-                            MaterialPageRoute(builder: (_) => GameScreen(level: LevelData.dailyLevel, isDaily: true))
-                          ).then((_) => setState(() {})); 
-                        },
+                        onTap: _playDailyPuzzle,
                       ),
                     ],
                   ),
@@ -128,10 +137,11 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: Colors.white,
           shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
+          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
+          border: Border.all(color: const Color(0xFFE5E9F0), width: 2),
         ),
         child: Icon(icon, color: color, size: 28),
       ),

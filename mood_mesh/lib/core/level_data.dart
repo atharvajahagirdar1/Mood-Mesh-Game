@@ -2,6 +2,7 @@ import '../models/level.dart';
 
 class LevelData {
   static int maxUnlockedLevel = 1;
+  static Map<int, int> levelStars = {}; // Store highest stars achieved per level
 
   static final List<Level> allLevels = [
     Level(id: 1, cols: 3, rows: 3, maxMoves: 5, movesFor3Stars: 4, movesFor2Stars: 2, initialGrid: [2, 2, 2, 0, 0, 0, 2, 2, 2]),
@@ -22,6 +23,12 @@ class LevelData {
   static void unlockNextLevel(int currentLevelId) {
     if (currentLevelId == maxUnlockedLevel && currentLevelId < allLevels.length) {
       maxUnlockedLevel++;
+    }
+  }
+
+  static void saveStars(int levelId, int stars) {
+    if (!levelStars.containsKey(levelId) || stars > levelStars[levelId]!) {
+      levelStars[levelId] = stars;
     }
   }
 

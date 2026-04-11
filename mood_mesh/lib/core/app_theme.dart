@@ -1,37 +1,41 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Pastel Color Palette
-  static const Color background = Color(0xFFFFF7F0);
+  // Minimalist, Clean Background Colors
+  static const Color backgroundLight = Color(0xFFFFFFFF); // Pure White
+  static const Color backgroundDark = Color(0xFFF0F4F8);  // Very subtle cool grey
   
-  // Vibrant 3D Button Colors
-  static const Color primary = Color(0xFFFFD166);
-  static const Color primaryDark = Color(0xFFE5BC5C);
+  // 3D Button Colors - High Contrast
+  static const Color primary = Color(0xFFFFB703); // Warm Gold
+  static const Color primaryDark = Color(0xFFE89D00); 
   
-  static const Color secondary = Color(0xFF6EC6FF);
-  static const Color secondaryDark = Color(0xFF5AB3E5);
+  static const Color secondary = Color(0xFF4EA8DE); // Bright Cyan
+  static const Color secondaryDark = Color(0xFF0077B6);
   
-  static const Color accent = Color(0xFFEF476F);
-  static const Color accentDark = Color(0xFFD63D62);
+  static const Color accent = Color(0xFFFF595E); // Punchy Red
+  static const Color accentDark = Color(0xFFD62828);
 
-  static const Color success = Color(0xFF06D6A0);
-  static const Color successDark = Color(0xFF05C08F);
+  static const Color success = Color(0xFF06D6A0); // Vivid Green
+  static const Color successDark = Color(0xFF05B083);
   
   static const Color coinGold = Color(0xFFFFC107);
-  static const Color coinDark = Color(0xFFF57F17);
+  static const Color coinDark = Color(0xFFF77F00);
+
+  // Hint Glow Colors
+  static const Color neonBlue = Color(0xFF00E5FF);
   
-  static const Color textDark = Color(0xFF2D3142);
-  static const Color textLight = Color(0xFF9094A6);
+  static const Color textDark = Color(0xFF1D2D44); // Deep Navy Blue for extreme readability
+  static const Color textLight = Color(0xFF748A9D);
   static const Color white = Colors.white;
 
   // Mood Colors
-  static const Color moodHappy = Color(0xFFFFD166);
-  static const Color moodAngry = Color(0xFFEF476F);
-  static const Color moodSleepy = Color(0xFF6EC6FF);
+  static const Color moodHappy = Color(0xFFFFB703);
+  static const Color moodAngry = Color(0xFFFF595E);
+  static const Color moodSleepy = Color(0xFF4EA8DE);
 
   static ThemeData get lightTheme {
     return ThemeData(
-      scaffoldBackgroundColor: background,
+      scaffoldBackgroundColor: backgroundLight,
       primaryColor: primary,
       fontFamily: 'Nunito', 
       appBarTheme: const AppBarTheme(
@@ -39,17 +43,17 @@ class AppTheme {
         elevation: 0,
         iconTheme: IconThemeData(color: textDark),
         centerTitle: true,
-        titleTextStyle: TextStyle(color: textDark, fontSize: 24, fontWeight: FontWeight.bold),
+        titleTextStyle: TextStyle(color: textDark, fontSize: 24, fontWeight: FontWeight.w900),
       ),
     );
   }
 
-  // Common UI Styles for Game Feel
   static BoxDecoration gameBoxDecoration = BoxDecoration(
     color: white,
     borderRadius: BorderRadius.circular(24),
     boxShadow: const [
-      BoxShadow(color: Color(0x1A000000), blurRadius: 10, offset: Offset(0, 8)),
+      BoxShadow(color: Color(0x0F000000), blurRadius: 20, offset: Offset(0, 8)), // Softer, modern shadow
     ],
+    border: Border.all(color: const Color(0xFFE5E9F0), width: 2), // Clean outline
   );
 }

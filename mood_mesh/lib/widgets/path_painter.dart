@@ -6,6 +6,8 @@ class PathPainter extends CustomPainter {
   final int rows;
   final Color pathColor;
   final double strokeWidth;
+  final bool isNeon;
+  final double pulseValue;
 
   PathPainter({
     required this.path, 
@@ -13,37 +15,69 @@ class PathPainter extends CustomPainter {
     required this.rows, 
     required this.pathColor,
     required this.strokeWidth,
+    this.isNeon = false,
+    this.pulseValue = 0.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (path.length < 2) return;
 
-    final paint = Paint()
-      ..color = pathColor
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
     double cellWidth = size.width / cols;
     double cellHeight = size.height / rows;
-
+    
+    // Construct single Path object for clean joints
+    Path fullPath = Path();
     for (int i = 0; i < path.length - 1; i++) {
       int p1 = path[i];
       int p2 = path[i + 1];
 
-      Offset start = Offset(
-        (p1 % cols) * cellWidth + cellWidth / 2,
-        (p1 ~/ cols) * cellHeight + cellHeight / 2,
-      );
+      Offset start = Offset((p1 % cols) * cellWidth + cellWidth / 2, (p1 ~/ cols) * cellHeight + cellHeight / 2);
+      Offset end = Offset((p2 % cols) * cellWidth + cellWidth / 2, (p2 ~/ cols) * cellHeight + cellHeight / 2);
 
-      Offset end = Offset(
-        (p2 % cols) * cellWidth + cellWidth / 2,
-        (p2 ~/ cols) * cellHeight + cellHeight / 2,
-      );
+      if (i == 0) fullPath.moveTo(start.dx, start.dy);
+      fullPath.lineTo(end.dx, end.dy);
+    }
 
-      // Main line
-      canvas.drawLine(start, end, paint);
+    if (isNeon) {
+      // 1. Neon Outer Glow
+      final glowPaint = Paint()
+        ..color = pathColor.withOpacity(0.4 + (pulseValue * 0.6))
+        ..strokeWidth = strokeWidth * 1.5
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 10 + (pulseValue * 10));
+      canvas.drawPath(fullPath, glowPaint);
+
+      // 2. Bright Neon Core
+      final corePaint = Paint()
+        ..color = Colors.white
+        ..strokeWidth = strokeWidth * 0.4
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke;
+      canvas.drawPath(fullPath, corePaint);
+      
+    } else {
+      // 1. Normal Path Shadow
+      final shadowPaint = Paint()
+        ..color = Colors.black26
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+      canvas.drawPath(fullPath, shadowPaint);
+
+      // 2. Normal Solid Player Line
+      final normalPaint = Paint()
+        ..color = pathColor
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke;
+      canvas.drawPath(fullPath, normalPaint);
     }
   }
 

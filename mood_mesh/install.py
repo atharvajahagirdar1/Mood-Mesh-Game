@@ -37,37 +37,41 @@ class MoodMeshApp extends StatelessWidget {
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Pastel Color Palette
-  static const Color background = Color(0xFFFFF7F0);
+  // Minimalist, Clean Background Colors
+  static const Color backgroundLight = Color(0xFFFFFFFF); // Pure White
+  static const Color backgroundDark = Color(0xFFF0F4F8);  // Very subtle cool grey
   
-  // Vibrant 3D Button Colors
-  static const Color primary = Color(0xFFFFD166);
-  static const Color primaryDark = Color(0xFFE5BC5C);
+  // 3D Button Colors - High Contrast
+  static const Color primary = Color(0xFFFFB703); // Warm Gold
+  static const Color primaryDark = Color(0xFFE89D00); 
   
-  static const Color secondary = Color(0xFF6EC6FF);
-  static const Color secondaryDark = Color(0xFF5AB3E5);
+  static const Color secondary = Color(0xFF4EA8DE); // Bright Cyan
+  static const Color secondaryDark = Color(0xFF0077B6);
   
-  static const Color accent = Color(0xFFEF476F);
-  static const Color accentDark = Color(0xFFD63D62);
+  static const Color accent = Color(0xFFFF595E); // Punchy Red
+  static const Color accentDark = Color(0xFFD62828);
 
-  static const Color success = Color(0xFF06D6A0);
-  static const Color successDark = Color(0xFF05C08F);
+  static const Color success = Color(0xFF06D6A0); // Vivid Green
+  static const Color successDark = Color(0xFF05B083);
   
   static const Color coinGold = Color(0xFFFFC107);
-  static const Color coinDark = Color(0xFFF57F17);
+  static const Color coinDark = Color(0xFFF77F00);
+
+  // Hint Glow Colors
+  static const Color neonBlue = Color(0xFF00E5FF);
   
-  static const Color textDark = Color(0xFF2D3142);
-  static const Color textLight = Color(0xFF9094A6);
+  static const Color textDark = Color(0xFF1D2D44); // Deep Navy Blue for extreme readability
+  static const Color textLight = Color(0xFF748A9D);
   static const Color white = Colors.white;
 
   // Mood Colors
-  static const Color moodHappy = Color(0xFFFFD166);
-  static const Color moodAngry = Color(0xFFEF476F);
-  static const Color moodSleepy = Color(0xFF6EC6FF);
+  static const Color moodHappy = Color(0xFFFFB703);
+  static const Color moodAngry = Color(0xFFFF595E);
+  static const Color moodSleepy = Color(0xFF4EA8DE);
 
   static ThemeData get lightTheme {
     return ThemeData(
-      scaffoldBackgroundColor: background,
+      scaffoldBackgroundColor: backgroundLight,
       primaryColor: primary,
       fontFamily: 'Nunito', 
       appBarTheme: const AppBarTheme(
@@ -75,18 +79,18 @@ class AppTheme {
         elevation: 0,
         iconTheme: IconThemeData(color: textDark),
         centerTitle: true,
-        titleTextStyle: TextStyle(color: textDark, fontSize: 24, fontWeight: FontWeight.bold),
+        titleTextStyle: TextStyle(color: textDark, fontSize: 24, fontWeight: FontWeight.w900),
       ),
     );
   }
 
-  // Common UI Styles for Game Feel
   static BoxDecoration gameBoxDecoration = BoxDecoration(
     color: white,
     borderRadius: BorderRadius.circular(24),
     boxShadow: const [
-      BoxShadow(color: Color(0x1A000000), blurRadius: 10, offset: Offset(0, 8)),
+      BoxShadow(color: Color(0x0F000000), blurRadius: 20, offset: Offset(0, 8)), // Softer, modern shadow
     ],
+    border: Border.all(color: const Color(0xFFE5E9F0), width: 2), // Clean outline
   );
 }
 """,
@@ -98,17 +102,15 @@ class GameSettings {
   static bool musicOn = true;
   static bool hapticsOn = true;
   
-  // Coin & Economy System
+  // Economy & Progression
   static int totalCoins = 0;
-  static int availableHints = 5; // Start with 5 free hints
+  static int availableHints = 5; 
   static const int hintCost = 20;
+  static String lastDailyPuzzleDate = ''; // Tracks when the player last completed the daily puzzle
 
   static String getEmoji(int moodIndex) {
-    if (currentTheme == 'animals') {
-      return ['🐶', '🐯', '🐨'][moodIndex]; 
-    } else if (currentTheme == 'fruits') {
-      return ['🍎', '🌶️', '🍇'][moodIndex]; 
-    }
+    if (currentTheme == 'animals') return ['🐶', '🐯', '🐨'][moodIndex]; 
+    if (currentTheme == 'fruits') return ['🍎', '🌶️', '🍇'][moodIndex]; 
     return ['😊', '😡', '😴'][moodIndex];
   }
 }
@@ -143,6 +145,7 @@ import '../models/level.dart';
 
 class LevelData {
   static int maxUnlockedLevel = 1;
+  static Map<int, int> levelStars = {}; // Store highest stars achieved per level
 
   static final List<Level> allLevels = [
     Level(id: 1, cols: 3, rows: 3, maxMoves: 5, movesFor3Stars: 4, movesFor2Stars: 2, initialGrid: [2, 2, 2, 0, 0, 0, 2, 2, 2]),
@@ -166,6 +169,12 @@ class LevelData {
     }
   }
 
+  static void saveStars(int levelId, int stars) {
+    if (!levelStars.containsKey(levelId) || stars > levelStars[levelId]!) {
+      levelStars[levelId] = stars;
+    }
+  }
+
   static Level getLevel(int id) {
     return allLevels.firstWhere((lvl) => lvl.id == id);
   }
@@ -175,7 +184,6 @@ class LevelData {
         "lib/widgets/game_button.dart": r"""
 import 'package:flutter/material.dart';
 
-// Attractive 3D Text Button (Used for Hints, Play, Next Level)
 class GameButton extends StatefulWidget {
   final String title;
   final Color color;
@@ -206,9 +214,7 @@ class _GameButtonState extends State<GameButton> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 100));
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.9).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut)
-    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.9).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -234,10 +240,7 @@ class _GameButtonState extends State<GameButton> with SingleTickerProviderStateM
         scale: _scaleAnimation,
         child: Container(
           width: widget.isSmall ? null : 240,
-          padding: EdgeInsets.symmetric(
-            vertical: widget.isSmall ? 12 : 18, 
-            horizontal: widget.isSmall ? 20 : 0
-          ),
+          padding: EdgeInsets.symmetric(vertical: widget.isSmall ? 12 : 18, horizontal: widget.isSmall ? 20 : 0),
           decoration: BoxDecoration(
             color: widget.color,
             borderRadius: BorderRadius.circular(30),
@@ -247,18 +250,10 @@ class _GameButtonState extends State<GameButton> with SingleTickerProviderStateM
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: widget.isSmall ? MainAxisSize.min : MainAxisSize.max,
             children: [
-              if (widget.icon != null) ...[
-                Icon(widget.icon, color: Colors.white, size: widget.isSmall ? 20 : 28),
-                const SizedBox(width: 10),
-              ],
+              if (widget.icon != null) ...[Icon(widget.icon, color: Colors.white, size: widget.isSmall ? 20 : 28), const SizedBox(width: 10)],
               Text(
                 widget.title,
-                style: TextStyle(
-                  fontSize: widget.isSmall ? 16 : 22,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 1.5,
-                ),
+                style: TextStyle(fontSize: widget.isSmall ? 16 : 22, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1.5),
               ),
             ],
           ),
@@ -268,20 +263,13 @@ class _GameButtonState extends State<GameButton> with SingleTickerProviderStateM
   }
 }
 
-// Attractive Circular 3D Icon Button (Used for Pause/Quit & Restart)
 class GameIconButton extends StatefulWidget {
   final IconData icon;
   final Color color;
   final Color shadowColor;
   final VoidCallback onTap;
 
-  const GameIconButton({
-    Key? key,
-    required this.icon,
-    required this.color,
-    required this.shadowColor,
-    required this.onTap,
-  }) : super(key: key);
+  const GameIconButton({Key? key, required this.icon, required this.color, required this.shadowColor, required this.onTap}) : super(key: key);
 
   @override
   _GameIconButtonState createState() => _GameIconButtonState();
@@ -295,9 +283,7 @@ class _GameIconButtonState extends State<GameIconButton> with SingleTickerProvid
   void initState() {
     super.initState();
     _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 100));
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.85).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut)
-    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.85).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -307,18 +293,13 @@ class _GameIconButtonState extends State<GameIconButton> with SingleTickerProvid
   }
 
   void _onTapDown(TapDownDetails details) => _controller.forward();
-  void _onTapUp(TapUpDetails details) {
-    _controller.reverse();
-    widget.onTap();
-  }
+  void _onTapUp(TapUpDetails details) { _controller.reverse(); widget.onTap(); }
   void _onTapCancel() => _controller.reverse();
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: _onTapDown,
-      onTapUp: _onTapUp,
-      onTapCancel: _onTapCancel,
+      onTapDown: _onTapDown, onTapUp: _onTapUp, onTapCancel: _onTapCancel,
       child: ScaleTransition(
         scale: _scaleAnimation,
         child: Container(
@@ -341,43 +322,39 @@ class _GameIconButtonState extends State<GameIconButton> with SingleTickerProvid
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 
-// Reusable animated attractive background for Home and Menus
+// Simple, Minimalist Background
 class AnimatedBackground extends StatelessWidget {
   const AnimatedBackground({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(color: AppTheme.background),
-        Positioned(
-          top: -80,
-          right: -50,
-          child: Container(
-            width: 250,
-            height: 250,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.primary.withOpacity(0.15)),
-          ),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppTheme.backgroundLight, AppTheme.backgroundDark],
+          stops: [0.3, 1.0],
         ),
-        Positioned(
-          bottom: -100,
-          left: -80,
-          child: Container(
-            width: 350,
-            height: 350,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.secondary.withOpacity(0.15)),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -150, right: -150,
+            child: Container(
+              width: 400, height: 400,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.primary.withOpacity(0.03)),
+            ),
           ),
-        ),
-        Positioned(
-          top: 200,
-          left: -40,
-          child: Container(
-            width: 150,
-            height: 150,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.accent.withOpacity(0.1)),
+          Positioned(
+            bottom: -200, left: -100,
+            child: Container(
+              width: 500, height: 500,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.secondary.withOpacity(0.03)),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -405,9 +382,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _controller = AnimationController(vsync: this, duration: const Duration(seconds: 1));
-    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut)
-    );
+    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
     _controller.forward();
     Future.delayed(const Duration(milliseconds: 2500), () {
@@ -435,7 +410,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 children: [
                   Text(GameSettings.getEmoji(0), style: const TextStyle(fontSize: 100)),
                   const SizedBox(height: 20),
-                  const Text('Mood Mesh', style: TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.textDark, letterSpacing: 2.0)),
+                  const Text('Mood Mesh', style: TextStyle(fontSize: 46, fontWeight: FontWeight.w900, color: AppTheme.textDark, letterSpacing: 2.0)),
                   const SizedBox(height: 10),
                   const Text('Connect the emotions', style: TextStyle(fontSize: 18, color: AppTheme.textLight, fontWeight: FontWeight.bold)),
                 ],
@@ -469,6 +444,31 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  void _playDailyPuzzle() {
+    String today = DateTime.now().toIso8601String().split('T')[0];
+    
+    if (GameSettings.lastDailyPuzzleDate == today) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text('🌟 All Done!', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.primary, fontSize: 26)),
+          content: const Text(
+            'You have already conquered today\'s daily puzzle.\n\nCome back tomorrow for a brand new challenge!', 
+            textAlign: TextAlign.center, 
+            style: TextStyle(fontSize: 18, color: AppTheme.textDark, fontWeight: FontWeight.w600)
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            GameButton(title: 'GOT IT', color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, isSmall: true, onTap: () => Navigator.pop(context))
+          ],
+        )
+      );
+    } else {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => GameScreen(level: LevelData.dailyLevel, isDaily: true))).then((_) => setState(() {})); 
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     int currentLevel = LevelData.maxUnlockedLevel;
@@ -480,46 +480,39 @@ class _HomeScreenState extends State<HomeScreen> {
           SafeArea(
             child: Stack(
               children: [
-                // Top Action Bar
                 Positioned(
                   top: 20, right: 20, left: 20,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _buildIconButton(Icons.palette_rounded, AppTheme.secondary, () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ThemesScreen())).then((_) {
-                          setState(() {}); 
-                        });
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ThemesScreen())).then((_) => setState(() {}));
                       }),
                       
-                      // Central Score Tab (Coin Counter)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
                           color: AppTheme.white,
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
+                          border: Border.all(color: const Color(0xFFE5E9F0), width: 2),
                         ),
                         child: Row(
                           children: [
                             const Icon(Icons.monetization_on_rounded, color: AppTheme.coinGold, size: 28),
                             const SizedBox(width: 8),
-                            Text(
-                              '${GameSettings.totalCoins}', 
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppTheme.textDark)
-                            ),
+                            Text('${GameSettings.totalCoins}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
                           ],
                         ),
                       ),
 
                       _buildIconButton(Icons.settings_rounded, AppTheme.textLight, () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())).then((_) => setState(() {}));
                       }),
                     ],
                   ),
                 ),
                 
-                // Main Content
                 Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -527,42 +520,33 @@ class _HomeScreenState extends State<HomeScreen> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.5),
+                          color: AppTheme.white,
                           shape: BoxShape.circle,
+                          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 15, offset: Offset(0, 10))],
                         ),
                         child: Text(GameSettings.getEmoji(0), style: const TextStyle(fontSize: 120)),
                       ),
-                      const SizedBox(height: 10),
-                      const Text('Mood Mesh', style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
+                      const SizedBox(height: 20),
+                      const Text('Mood Mesh', style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: AppTheme.textDark, letterSpacing: -1.0)),
                       const SizedBox(height: 60),
                       
-                      // Main Play Button
                       GameButton(
                         title: 'PLAY LEVEL $currentLevel',
                         icon: Icons.play_arrow_rounded,
                         color: AppTheme.primary,
                         shadowColor: AppTheme.primaryDark,
                         onTap: () {
-                          Navigator.push(
-                            context, 
-                            MaterialPageRoute(builder: (_) => const LevelSelectScreen())
-                          ).then((_) => setState(() {})); 
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelSelectScreen())).then((_) => setState(() {})); 
                         },
                       ),
                       const SizedBox(height: 20),
                       
-                      // Daily Puzzle Button
                       GameButton(
                         title: 'DAILY PUZZLE',
                         icon: Icons.calendar_month_rounded,
                         color: AppTheme.accent,
                         shadowColor: AppTheme.accentDark,
-                        onTap: () {
-                          Navigator.push(
-                            context, 
-                            MaterialPageRoute(builder: (_) => GameScreen(level: LevelData.dailyLevel, isDaily: true))
-                          ).then((_) => setState(() {})); 
-                        },
+                        onTap: _playDailyPuzzle,
                       ),
                     ],
                   ),
@@ -580,10 +564,11 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: Colors.white,
           shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
+          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
+          border: Border.all(color: const Color(0xFFE5E9F0), width: 2),
         ),
         child: Icon(icon, color: color, size: 28),
       ),
@@ -606,10 +591,11 @@ class ThemesScreen extends StatefulWidget {
 }
 
 class _ThemesScreenState extends State<ThemesScreen> {
-  final List<Map<String, String>> themes = [
-    {'id': 'classic', 'name': 'Classic', 'preview': '😊'},
-    {'id': 'animals', 'name': 'Animals', 'preview': '🐶'},
-    {'id': 'fruits', 'name': 'Fruits', 'preview': '🍎'},
+  final List<Map<String, dynamic>> themes = [
+    {'id': 'classic', 'name': 'Classic', 'preview': '😊', 'locked': false},
+    {'id': 'animals', 'name': 'Animals', 'preview': '🐶', 'locked': false},
+    {'id': 'fruits', 'name': 'Fruits', 'preview': '🍎', 'locked': false},
+    {'id': 'soon', 'name': 'Coming Soon', 'preview': '🔒', 'locked': true},
   ];
 
   @override
@@ -624,41 +610,29 @@ class _ThemesScreenState extends State<ThemesScreen> {
             child: Padding(
               padding: const EdgeInsets.all(20.0),
               child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 20, mainAxisSpacing: 20),
                 itemCount: themes.length,
                 itemBuilder: (context, index) {
                   final theme = themes[index];
-                  final isSelected = GameSettings.currentTheme == theme['id']!;
+                  final bool isLocked = theme['locked'];
+                  final isSelected = !isLocked && GameSettings.currentTheme == theme['id'];
 
                   return GestureDetector(
-                    onTap: () {
-                      setState(() => GameSettings.currentTheme = theme['id']!);
-                    },
+                    onTap: isLocked ? null : () => setState(() => GameSettings.currentTheme = theme['id']),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppTheme.primary : AppTheme.white,
+                        color: isSelected ? AppTheme.primary : (isLocked ? Colors.grey.shade300 : AppTheme.white),
                         borderRadius: BorderRadius.circular(24),
-                        border: Border(bottom: BorderSide(color: isSelected ? AppTheme.primaryDark : Colors.black12, width: 6)),
-                        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 5))],
+                        border: Border.all(color: isSelected ? AppTheme.primaryDark : const Color(0xFFE5E9F0), width: isSelected ? 4 : 2),
+                        boxShadow: isLocked ? [] : const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 5))],
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(theme['preview']!, style: const TextStyle(fontSize: 60)),
+                          Text(theme['preview'], style: TextStyle(fontSize: 60, color: isLocked ? Colors.black38 : null)),
                           const SizedBox(height: 10),
-                          Text(
-                            theme['name']!, 
-                            style: TextStyle(
-                              fontSize: 20, 
-                              fontWeight: FontWeight.bold,
-                              color: isSelected ? Colors.white : AppTheme.textDark
-                            )
-                          ),
+                          Text(theme['name'], style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isSelected ? Colors.white : (isLocked ? Colors.black38 : AppTheme.textDark))),
                         ],
                       ),
                     ),
@@ -709,7 +683,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const Divider(height: 1),
                         _buildToggle('Music', Icons.music_note_rounded, GameSettings.musicOn, (val) => setState(() => GameSettings.musicOn = val)),
                         const Divider(height: 1),
-                        _buildToggle('Haptics (Vibration)', Icons.vibration_rounded, GameSettings.hapticsOn, (val) => setState(() => GameSettings.hapticsOn = val)),
+                        _buildToggle('Haptics', Icons.vibration_rounded, GameSettings.hapticsOn, (val) => setState(() => GameSettings.hapticsOn = val)),
                       ],
                     ),
                   ),
@@ -727,11 +701,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       leading: Icon(icon, color: AppTheme.primary, size: 28),
       title: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textDark)),
-      trailing: Switch(
-        value: value,
-        activeColor: AppTheme.primary,
-        onChanged: onChanged,
-      ),
+      trailing: Switch(value: value, activeColor: AppTheme.primary, onChanged: onChanged),
     );
   }
 }
@@ -759,7 +729,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
       appBar: AppBar(title: const Text('Select Level'), backgroundColor: Colors.transparent, elevation: 0),
       body: Stack(
         children: [
-          const AnimatedBackground(), // Enhanced UI with animated background
+          const AnimatedBackground(), 
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(20.0),
@@ -773,31 +743,47 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                 itemBuilder: (context, index) {
                   final level = LevelData.allLevels[index];
                   final isUnlocked = level.id <= LevelData.maxUnlockedLevel;
+                  final stars = LevelData.levelStars[level.id] ?? 0;
 
                   return GestureDetector(
                     onTap: isUnlocked ? () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: false)),
-                      );
+                      await Navigator.push(context, MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: false)));
                       setState(() {}); 
                     } : null,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: isUnlocked ? AppTheme.primary : AppTheme.textLight.withOpacity(0.3),
+                        color: isUnlocked ? AppTheme.primary : AppTheme.backgroundDark,
                         borderRadius: BorderRadius.circular(20),
-                        // 3D attractive card look
-                        border: Border(bottom: BorderSide(
-                          color: isUnlocked ? AppTheme.primaryDark : Colors.grey.withOpacity(0.5), 
-                          width: 6
-                        )),
+                        border: Border(bottom: BorderSide(color: isUnlocked ? AppTheme.primaryDark : const Color(0xFFD0D6E0), width: 6)),
                         boxShadow: isUnlocked ? const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 4))] : [],
                       ),
-                      child: Center(
-                        child: isUnlocked 
-                            ? Text('${level.id}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white))
-                            : const Icon(Icons.lock_rounded, color: Colors.white70, size: 36),
-                      ),
+                      child: isUnlocked 
+                          ? Stack(
+                              children: [
+                                Center(
+                                  child: Text('${level.id}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white)),
+                                ),
+                                if (level.id < LevelData.maxUnlockedLevel || stars > 0)
+                                  Positioned(
+                                    bottom: 8,
+                                    left: 0,
+                                    right: 0,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: List.generate(3, (starIndex) {
+                                        return Icon(
+                                          Icons.star_rounded,
+                                          size: 16,
+                                          color: starIndex < stars ? Colors.white : Colors.black12,
+                                        );
+                                      }),
+                                    ),
+                                  ),
+                              ],
+                            )
+                          : const Center(
+                              child: Icon(Icons.lock_rounded, color: Colors.black26, size: 36),
+                            ),
                     ),
                   );
                 },
@@ -819,6 +805,7 @@ import '../core/game_settings.dart';
 import '../widgets/dot_widget.dart';
 import '../widgets/path_painter.dart';
 import '../widgets/game_button.dart';
+import '../widgets/animated_background.dart';
 import 'level_complete_screen.dart';
 import 'game_over_screen.dart';
 
@@ -837,7 +824,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
   List<int> path = [];
   bool isProcessing = false;
 
-  // New Hint Path System Variables
+  // Neon Hint Path System
   List<int> hintedPath = [];
   bool isHintActive = false;
   late AnimationController _hintPulseController;
@@ -865,14 +852,13 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     setState(() {});
   }
 
-  // Calculate full valid path using DFS
   void _executeHint() {
     List<int> bestPath = [];
     for (int i = 0; i < grid.length; i++) {
       if (grid[i] == Mood.happy) {
         List<int> currentPath = [i];
         _dfsFindPath(i, currentPath, bestPath);
-        if (bestPath.length >= 3) break; // If we find a solid path, stop searching
+        if (bestPath.length >= 3) break; 
       }
     }
     
@@ -1022,139 +1008,131 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     bool hasFreeHints = GameSettings.availableHints > 0;
 
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: Stack(
+        children: [
+          const AnimatedBackground(),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+              child: Column(
                 children: [
-                  GameIconButton(
-                    icon: Icons.pause_rounded, 
-                    color: AppTheme.accent, 
-                    shadowColor: AppTheme.accentDark,
-                    onTap: () => Navigator.pop(context), 
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      GameIconButton(icon: Icons.pause_rounded, color: AppTheme.accent, shadowColor: AppTheme.accentDark, onTap: () => Navigator.pop(context)),
+                      Text(topTitle, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
+                      GameIconButton(icon: Icons.refresh_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, onTap: _initLevel),
+                    ],
                   ),
-                  Text(topTitle, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
-                  GameIconButton(
-                    icon: Icons.refresh_rounded, 
-                    color: AppTheme.secondary, 
-                    shadowColor: AppTheme.secondaryDark,
-                    onTap: _initLevel,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                decoration: AppTheme.gameBoxDecoration,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text("MOVES LEFT: ", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textLight)),
-                    Text(
-                      "$movesLeft", 
-                      style: TextStyle(
-                        fontSize: 28, 
-                        fontWeight: FontWeight.w900, 
-                        color: movesLeft <= 3 ? AppTheme.accent : AppTheme.secondary
-                      )
+                  const SizedBox(height: 20),
+                  
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                    decoration: AppTheme.gameBoxDecoration,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text("MOVES LEFT: ", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textLight)),
+                        Text("$movesLeft", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: movesLeft <= 3 ? AppTheme.accent : AppTheme.secondary)),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 40),
+                  ),
+                  const SizedBox(height: 40),
 
-              Expanded(
-                child: Center(
-                  child: AspectRatio(
-                    aspectRatio: widget.level.cols / widget.level.rows,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return GestureDetector(
-                          onPanStart: (details) => _handlePanStart(details.localPosition, constraints.biggest),
-                          onPanUpdate: (details) => _handlePanUpdate(details.localPosition, constraints.biggest),
-                          onPanEnd: (_) => _triggerRipple(),
-                          child: Container(
-                            decoration: AppTheme.gameBoxDecoration,
-                            padding: const EdgeInsets.all(10),
-                            child: Stack(
-                              children: [
-                                // Pulsing Hint Path (Underneath user path)
-                                if (isHintActive && hintedPath.isNotEmpty)
-                                  AnimatedBuilder(
-                                    animation: _hintPulseController,
-                                    builder: (context, child) {
-                                      return CustomPaint(
+                  Expanded(
+                    child: Center(
+                      child: AspectRatio(
+                        aspectRatio: widget.level.cols / widget.level.rows,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return GestureDetector(
+                              onPanStart: (details) => _handlePanStart(details.localPosition, constraints.biggest),
+                              onPanUpdate: (details) => _handlePanUpdate(details.localPosition, constraints.biggest),
+                              onPanEnd: (_) => _triggerRipple(),
+                              child: Container(
+                                decoration: AppTheme.gameBoxDecoration,
+                                padding: const EdgeInsets.all(10),
+                                child: Stack(
+                                  children: [
+                                    // 1. Neon Pulsing Hint Path (Underneath)
+                                    if (isHintActive && hintedPath.isNotEmpty)
+                                      AnimatedBuilder(
+                                        animation: _hintPulseController,
+                                        builder: (context, child) {
+                                          return CustomPaint(
+                                            size: constraints.biggest,
+                                            painter: PathPainter(
+                                              path: hintedPath, 
+                                              cols: widget.level.cols, 
+                                              rows: widget.level.rows,
+                                              pathColor: AppTheme.neonBlue, 
+                                              strokeWidth: 20.0, 
+                                              isNeon: true,
+                                              pulseValue: _hintPulseController.value
+                                            ),
+                                          );
+                                        }
+                                      ),
+                                    
+                                    // 2. Solid Player Draw Path
+                                    if (path.isNotEmpty)
+                                      CustomPaint(
                                         size: constraints.biggest,
                                         painter: PathPainter(
-                                          path: hintedPath, 
+                                          path: path, 
                                           cols: widget.level.cols, 
                                           rows: widget.level.rows,
-                                          pathColor: AppTheme.primary.withOpacity(0.3 + (_hintPulseController.value * 0.6)), // Pulsing glow
-                                          strokeWidth: 24.0, // Thicker for hint
+                                          pathColor: Colors.white, 
+                                          strokeWidth: 18.0,
+                                          isNeon: false,
                                         ),
-                                      );
-                                    }
-                                  ),
-                                
-                                // Highly Visible User Drag Path
-                                CustomPaint(
-                                  size: constraints.biggest,
-                                  painter: PathPainter(
-                                    path: path, 
-                                    cols: widget.level.cols, 
-                                    rows: widget.level.rows,
-                                    pathColor: Colors.white, // Very visible solid white
-                                    strokeWidth: 16.0,
-                                  ),
-                                ),
-                                GridView.builder(
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: widget.level.cols,
-                                  ),
-                                  itemCount: grid.length,
-                                  itemBuilder: (context, index) {
-                                    return Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: DotWidget(
-                                        key: ValueKey(index),
-                                        mood: grid[index],
-                                        isInPath: path.contains(index),
-                                        isLast: path.isNotEmpty && path.last == index,
-                                        isHighlighted: false, // Hint highlight is now handled by PathPainter glow
                                       ),
-                                    );
-                                  },
+
+                                    // 3. The Grid
+                                    GridView.builder(
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: widget.level.cols),
+                                      itemCount: grid.length,
+                                      itemBuilder: (context, index) {
+                                        return Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: DotWidget(
+                                            key: ValueKey(index),
+                                            mood: grid[index],
+                                            isInPath: path.contains(index),
+                                            isLast: path.isNotEmpty && path.last == index,
+                                            isHighlighted: false, 
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
+                              ),
+                            );
+                          }
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  
+                  GameButton(
+                    title: hasFreeHints 
+                        ? 'USE HINT (${GameSettings.availableHints})' 
+                        : 'BUY HINT (${GameSettings.hintCost}🪙)',
+                    icon: Icons.lightbulb_rounded,
+                    color: hasFreeHints ? AppTheme.primary : AppTheme.coinGold,
+                    shadowColor: hasFreeHints ? AppTheme.primaryDark : AppTheme.coinDark,
+                    isSmall: true,
+                    onTap: _useHint,
+                  ),
+                  const SizedBox(height: 20),
+                ],
               ),
-              const SizedBox(height: 20),
-              
-              GameButton(
-                title: hasFreeHints 
-                    ? 'USE HINT (${GameSettings.availableHints})' 
-                    : 'BUY HINT (${GameSettings.hintCost}🪙)',
-                icon: Icons.lightbulb_rounded,
-                color: hasFreeHints ? AppTheme.primary : AppTheme.coinGold,
-                shadowColor: hasFreeHints ? AppTheme.primaryDark : AppTheme.coinDark,
-                isSmall: true,
-                onTap: _useHint,
-              ),
-              const SizedBox(height: 20),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1185,6 +1163,7 @@ class LevelCompleteScreen extends StatefulWidget {
 class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
   int targetStars = 1;
   int coinsEarned = 0;
+  bool isReplay = false;
   
   double _star1Scale = 0.0;
   double _star2Scale = 0.0;
@@ -1193,22 +1172,35 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
   @override
   void initState() {
     super.initState();
-    // Calculate Stars & Coin Rewards
+    
+    // Check if player is replaying a previously completed level
+    if (!widget.isDaily && widget.level.id < LevelData.maxUnlockedLevel) {
+      isReplay = true;
+    }
+
+    // Performance-based Stars & Rewards Logic
     if (widget.movesLeft >= widget.level.movesFor3Stars) {
       targetStars = 3;
-      coinsEarned = 30;
+      coinsEarned = isReplay ? 0 : 30; // 0 coins for replay!
     } else if (widget.movesLeft >= widget.level.movesFor2Stars) {
       targetStars = 2;
-      coinsEarned = 20;
+      coinsEarned = isReplay ? 0 : 20;
     } else {
       targetStars = 1;
-      coinsEarned = 10;
+      coinsEarned = isReplay ? 0 : 10;
     }
     
-    GameSettings.totalCoins += coinsEarned;
-    
-    if (!widget.isDaily) {
+    if (!isReplay && !widget.isDaily) {
+      GameSettings.totalCoins += coinsEarned;
       LevelData.unlockNextLevel(widget.level.id);
+    } else if (widget.isDaily && targetStars > 0) {
+      // Mark daily puzzle as done for today
+      GameSettings.lastDailyPuzzleDate = DateTime.now().toIso8601String().split('T')[0];
+      GameSettings.totalCoins += coinsEarned;
+    }
+
+    if (!widget.isDaily) {
+      LevelData.saveStars(widget.level.id, targetStars);
     }
 
     _animateStars();
@@ -1230,7 +1222,7 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          const AnimatedBackground(), // Enhanced UI Background
+          const AnimatedBackground(), 
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1242,67 +1234,47 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppTheme.success),
                 ),
+                
                 const SizedBox(height: 30),
                 
-                // Enhanced Staggered Star Display
+                // Staggered Star Display
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    AnimatedScale(
-                      scale: _star1Scale,
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.elasticOut,
-                      child: Icon(Icons.star_rounded, size: 70, color: AppTheme.primary),
-                    ),
+                    AnimatedScale(scale: _star1Scale, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: Icon(Icons.star_rounded, size: 70, color: AppTheme.primary)),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 40.0, left: 10, right: 10),
-                      child: AnimatedScale(
-                        scale: _star2Scale,
-                        duration: const Duration(milliseconds: 500),
-                        curve: Curves.elasticOut,
-                        child: Icon(Icons.star_rounded, size: 90, color: AppTheme.primary),
-                      ),
+                      child: AnimatedScale(scale: _star2Scale, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: Icon(Icons.star_rounded, size: 90, color: AppTheme.primary)),
                     ),
-                    AnimatedScale(
-                      scale: _star3Scale,
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.elasticOut,
-                      child: Icon(Icons.star_rounded, size: 70, color: AppTheme.primary),
-                    ),
+                    AnimatedScale(scale: _star3Scale, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: Icon(Icons.star_rounded, size: 70, color: AppTheme.primary)),
                   ],
                 ),
                 const SizedBox(height: 20),
 
-                // Animated Coin Reward System
+                // Animated Coin Reward System (or Replay Notice)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                  decoration: BoxDecoration(
-                    color: AppTheme.white,
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.monetization_on_rounded, color: AppTheme.coinGold, size: 36),
-                      const SizedBox(width: 10),
-                      TweenAnimationBuilder<int>(
-                        tween: IntTween(begin: 0, end: coinsEarned),
-                        duration: const Duration(milliseconds: 1500),
-                        curve: Curves.easeOutQuart,
-                        builder: (context, value, child) {
-                          return Text(
-                            '+$value COINS', 
-                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.textDark)
-                          );
-                        }
-                      ),
-                    ],
-                  ),
+                  decoration: BoxDecoration(color: AppTheme.white, borderRadius: BorderRadius.circular(30), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))], border: Border.all(color: const Color(0xFFE5E9F0), width: 2)),
+                  child: isReplay 
+                    ? const Text('REPLAY - NO COINS 🪙', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.textLight))
+                    : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.monetization_on_rounded, color: AppTheme.coinGold, size: 36),
+                        const SizedBox(width: 10),
+                        TweenAnimationBuilder<int>(
+                          tween: IntTween(begin: 0, end: coinsEarned),
+                          duration: const Duration(milliseconds: 1500),
+                          curve: Curves.easeOutQuart,
+                          builder: (context, value, child) {
+                            return Text('+$value COINS', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.textDark));
+                          }
+                        ),
+                      ],
+                    ),
                 ),
-                const SizedBox(height: 50),
+                const SizedBox(height: 40),
 
-                // Next Level Button (Hidden if Daily)
                 if (!widget.isDaily) ...[
                   GameButton(
                     title: 'NEXT LEVEL',
@@ -1321,27 +1293,13 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
                   const SizedBox(height: 20),
                 ],
 
-                // Home / Replay row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    GameButton(
-                      title: 'HOME',
-                      icon: Icons.home_rounded,
-                      color: AppTheme.secondary,
-                      shadowColor: AppTheme.secondaryDark,
-                      isSmall: true,
-                      onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen())),
-                    ),
+                    GameButton(title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, isSmall: true, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()))),
                     const SizedBox(width: 15),
-                    GameButton(
-                      title: 'REPLAY',
-                      icon: Icons.replay_rounded,
-                      color: AppTheme.primary,
-                      shadowColor: AppTheme.primaryDark,
-                      isSmall: true,
-                      onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily))),
-                    ),
+                    if (!widget.isDaily) // Replaying daily puzzle instantly might not be wanted if it's once a day
+                      GameButton(title: 'REPLAY', icon: Icons.replay_rounded, color: AppTheme.primary, shadowColor: AppTheme.primaryDark, isSmall: true, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily)))),
                   ],
                 )
               ],
@@ -1380,36 +1338,20 @@ class GameOverScreen extends StatelessWidget {
               children: [
                 const Text('💔', style: TextStyle(fontSize: 100)),
                 const SizedBox(height: 10),
-                const Text(
-                  'OUT OF MOVES',
-                  style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppTheme.accent),
-                ),
+                const Text('OUT OF MOVES', style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppTheme.accent)),
                 const SizedBox(height: 15),
-                const Text(
-                  'Don\'t give up! Try a different path.',
-                  style: TextStyle(fontSize: 18, color: AppTheme.textDark, fontWeight: FontWeight.bold),
-                ),
+                const Text('Don\'t give up! Try a different path.', style: TextStyle(fontSize: 18, color: AppTheme.textDark, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 60),
 
                 GameButton(
-                  title: 'TRY AGAIN',
-                  icon: Icons.refresh_rounded,
-                  color: AppTheme.accent,
-                  shadowColor: AppTheme.accentDark,
-                  onTap: () {
-                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: isDaily)));
-                  },
+                  title: 'TRY AGAIN', icon: Icons.refresh_rounded, color: AppTheme.accent, shadowColor: AppTheme.accentDark,
+                  onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: isDaily))),
                 ),
                 const SizedBox(height: 20),
                 
                 GameButton(
-                  title: 'HOME',
-                  icon: Icons.home_rounded,
-                  color: AppTheme.secondary,
-                  shadowColor: AppTheme.secondaryDark,
-                  onTap: () {
-                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-                  },
+                  title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark,
+                  onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen())),
                 ),
               ],
             ),
@@ -1452,7 +1394,7 @@ class DotWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedScale(
-      scale: isInPath ? 0.85 : (isHighlighted ? 1.1 : 1.0),
+      scale: isInPath ? 0.85 : 1.0,
       duration: const Duration(milliseconds: 150),
       curve: Curves.easeOutBack,
       child: AnimatedContainer(
@@ -1460,9 +1402,7 @@ class DotWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: moodColor,
           shape: BoxShape.circle,
-          border: isLast 
-              ? Border.all(color: Colors.white, width: 5) 
-              : null,
+          border: isLast ? Border.all(color: Colors.white, width: 5) : Border.all(color: Colors.black.withOpacity(0.05), width: 1),
           boxShadow: isInPath ? [] : const [
             BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 4)),
             BoxShadow(color: Colors.white30, blurRadius: 2, offset: Offset(0, -2)) 
@@ -1489,6 +1429,8 @@ class PathPainter extends CustomPainter {
   final int rows;
   final Color pathColor;
   final double strokeWidth;
+  final bool isNeon;
+  final double pulseValue;
 
   PathPainter({
     required this.path, 
@@ -1496,37 +1438,69 @@ class PathPainter extends CustomPainter {
     required this.rows, 
     required this.pathColor,
     required this.strokeWidth,
+    this.isNeon = false,
+    this.pulseValue = 0.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (path.length < 2) return;
 
-    final paint = Paint()
-      ..color = pathColor
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
     double cellWidth = size.width / cols;
     double cellHeight = size.height / rows;
-
+    
+    // Construct single Path object for clean joints
+    Path fullPath = Path();
     for (int i = 0; i < path.length - 1; i++) {
       int p1 = path[i];
       int p2 = path[i + 1];
 
-      Offset start = Offset(
-        (p1 % cols) * cellWidth + cellWidth / 2,
-        (p1 ~/ cols) * cellHeight + cellHeight / 2,
-      );
+      Offset start = Offset((p1 % cols) * cellWidth + cellWidth / 2, (p1 ~/ cols) * cellHeight + cellHeight / 2);
+      Offset end = Offset((p2 % cols) * cellWidth + cellWidth / 2, (p2 ~/ cols) * cellHeight + cellHeight / 2);
 
-      Offset end = Offset(
-        (p2 % cols) * cellWidth + cellWidth / 2,
-        (p2 ~/ cols) * cellHeight + cellHeight / 2,
-      );
+      if (i == 0) fullPath.moveTo(start.dx, start.dy);
+      fullPath.lineTo(end.dx, end.dy);
+    }
 
-      // Main line
-      canvas.drawLine(start, end, paint);
+    if (isNeon) {
+      // 1. Neon Outer Glow
+      final glowPaint = Paint()
+        ..color = pathColor.withOpacity(0.4 + (pulseValue * 0.6))
+        ..strokeWidth = strokeWidth * 1.5
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 10 + (pulseValue * 10));
+      canvas.drawPath(fullPath, glowPaint);
+
+      // 2. Bright Neon Core
+      final corePaint = Paint()
+        ..color = Colors.white
+        ..strokeWidth = strokeWidth * 0.4
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke;
+      canvas.drawPath(fullPath, corePaint);
+      
+    } else {
+      // 1. Normal Path Shadow
+      final shadowPaint = Paint()
+        ..color = Colors.black26
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+      canvas.drawPath(fullPath, shadowPaint);
+
+      // 2. Normal Solid Player Line
+      final normalPaint = Paint()
+        ..color = pathColor
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke;
+      canvas.drawPath(fullPath, normalPaint);
     }
   }
 
@@ -1563,7 +1537,7 @@ def inject_files():
     print("\n🎉 INJECTION COMPLETE! Your game UI is now fully upgraded.")
     print("-" * 50)
     print("To run your game, execute the following command in your terminal:")
-    print("  flutter run")
+    print("  flutter clean && flutter pub get && flutter run")
     print("-" * 50)
 
 if __name__ == "__main__":

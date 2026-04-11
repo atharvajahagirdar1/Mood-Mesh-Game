@@ -1,43 +1,39 @@
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 
-// Reusable animated attractive background for Home and Menus
+// Simple, Minimalist Background
 class AnimatedBackground extends StatelessWidget {
   const AnimatedBackground({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(color: AppTheme.background),
-        Positioned(
-          top: -80,
-          right: -50,
-          child: Container(
-            width: 250,
-            height: 250,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.primary.withOpacity(0.15)),
-          ),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppTheme.backgroundLight, AppTheme.backgroundDark],
+          stops: [0.3, 1.0],
         ),
-        Positioned(
-          bottom: -100,
-          left: -80,
-          child: Container(
-            width: 350,
-            height: 350,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.secondary.withOpacity(0.15)),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -150, right: -150,
+            child: Container(
+              width: 400, height: 400,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.primary.withOpacity(0.03)),
+            ),
           ),
-        ),
-        Positioned(
-          top: 200,
-          left: -40,
-          child: Container(
-            width: 150,
-            height: 150,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.accent.withOpacity(0.1)),
+          Positioned(
+            bottom: -200, left: -100,
+            child: Container(
+              width: 500, height: 500,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.secondary.withOpacity(0.03)),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -11,10 +11,11 @@ class ThemesScreen extends StatefulWidget {
 }
 
 class _ThemesScreenState extends State<ThemesScreen> {
-  final List<Map<String, String>> themes = [
-    {'id': 'classic', 'name': 'Classic', 'preview': '😊'},
-    {'id': 'animals', 'name': 'Animals', 'preview': '🐶'},
-    {'id': 'fruits', 'name': 'Fruits', 'preview': '🍎'},
+  final List<Map<String, dynamic>> themes = [
+    {'id': 'classic', 'name': 'Classic', 'preview': '😊', 'locked': false},
+    {'id': 'animals', 'name': 'Animals', 'preview': '🐶', 'locked': false},
+    {'id': 'fruits', 'name': 'Fruits', 'preview': '🍎', 'locked': false},
+    {'id': 'soon', 'name': 'Coming Soon', 'preview': '🔒', 'locked': true},
   ];
 
   @override
@@ -29,41 +30,29 @@ class _ThemesScreenState extends State<ThemesScreen> {
             child: Padding(
               padding: const EdgeInsets.all(20.0),
               child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 20, mainAxisSpacing: 20),
                 itemCount: themes.length,
                 itemBuilder: (context, index) {
                   final theme = themes[index];
-                  final isSelected = GameSettings.currentTheme == theme['id']!;
+                  final bool isLocked = theme['locked'];
+                  final isSelected = !isLocked && GameSettings.currentTheme == theme['id'];
 
                   return GestureDetector(
-                    onTap: () {
-                      setState(() => GameSettings.currentTheme = theme['id']!);
-                    },
+                    onTap: isLocked ? null : () => setState(() => GameSettings.currentTheme = theme['id']),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppTheme.primary : AppTheme.white,
+                        color: isSelected ? AppTheme.primary : (isLocked ? Colors.grey.shade300 : AppTheme.white),
                         borderRadius: BorderRadius.circular(24),
-                        border: Border(bottom: BorderSide(color: isSelected ? AppTheme.primaryDark : Colors.black12, width: 6)),
-                        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 5))],
+                        border: Border.all(color: isSelected ? AppTheme.primaryDark : const Color(0xFFE5E9F0), width: isSelected ? 4 : 2),
+                        boxShadow: isLocked ? [] : const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 5))],
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(theme['preview']!, style: const TextStyle(fontSize: 60)),
+                          Text(theme['preview'], style: TextStyle(fontSize: 60, color: isLocked ? Colors.black38 : null)),
                           const SizedBox(height: 10),
-                          Text(
-                            theme['name']!, 
-                            style: TextStyle(
-                              fontSize: 20, 
-                              fontWeight: FontWeight.bold,
-                              color: isSelected ? Colors.white : AppTheme.textDark
-                            )
-                          ),
+                          Text(theme['name'], style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isSelected ? Colors.white : (isLocked ? Colors.black38 : AppTheme.textDark))),
                         ],
                       ),
                     ),

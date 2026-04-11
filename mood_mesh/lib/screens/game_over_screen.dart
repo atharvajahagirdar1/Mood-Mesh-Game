@@ -23,36 +23,20 @@ class GameOverScreen extends StatelessWidget {
               children: [
                 const Text('💔', style: TextStyle(fontSize: 100)),
                 const SizedBox(height: 10),
-                const Text(
-                  'OUT OF MOVES',
-                  style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppTheme.accent),
-                ),
+                const Text('OUT OF MOVES', style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppTheme.accent)),
                 const SizedBox(height: 15),
-                const Text(
-                  'Don\'t give up! Try a different path.',
-                  style: TextStyle(fontSize: 18, color: AppTheme.textDark, fontWeight: FontWeight.bold),
-                ),
+                const Text('Don\'t give up! Try a different path.', style: TextStyle(fontSize: 18, color: AppTheme.textDark, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 60),
 
                 GameButton(
-                  title: 'TRY AGAIN',
-                  icon: Icons.refresh_rounded,
-                  color: AppTheme.accent,
-                  shadowColor: AppTheme.accentDark,
-                  onTap: () {
-                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: isDaily)));
-                  },
+                  title: 'TRY AGAIN', icon: Icons.refresh_rounded, color: AppTheme.accent, shadowColor: AppTheme.accentDark,
+                  onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: isDaily))),
                 ),
                 const SizedBox(height: 20),
                 
                 GameButton(
-                  title: 'HOME',
-                  icon: Icons.home_rounded,
-                  color: AppTheme.secondary,
-                  shadowColor: AppTheme.secondaryDark,
-                  onTap: () {
-                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-                  },
+                  title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark,
+                  onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen())),
                 ),
               ],
             ),

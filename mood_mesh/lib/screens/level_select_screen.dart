@@ -19,7 +19,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
       appBar: AppBar(title: const Text('Select Level'), backgroundColor: Colors.transparent, elevation: 0),
       body: Stack(
         children: [
-          const AnimatedBackground(), // Enhanced UI with animated background
+          const AnimatedBackground(), 
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(20.0),
@@ -33,31 +33,47 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                 itemBuilder: (context, index) {
                   final level = LevelData.allLevels[index];
                   final isUnlocked = level.id <= LevelData.maxUnlockedLevel;
+                  final stars = LevelData.levelStars[level.id] ?? 0;
 
                   return GestureDetector(
                     onTap: isUnlocked ? () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: false)),
-                      );
+                      await Navigator.push(context, MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: false)));
                       setState(() {}); 
                     } : null,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: isUnlocked ? AppTheme.primary : AppTheme.textLight.withOpacity(0.3),
+                        color: isUnlocked ? AppTheme.primary : AppTheme.backgroundDark,
                         borderRadius: BorderRadius.circular(20),
-                        // 3D attractive card look
-                        border: Border(bottom: BorderSide(
-                          color: isUnlocked ? AppTheme.primaryDark : Colors.grey.withOpacity(0.5), 
-                          width: 6
-                        )),
+                        border: Border(bottom: BorderSide(color: isUnlocked ? AppTheme.primaryDark : const Color(0xFFD0D6E0), width: 6)),
                         boxShadow: isUnlocked ? const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 4))] : [],
                       ),
-                      child: Center(
-                        child: isUnlocked 
-                            ? Text('${level.id}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white))
-                            : const Icon(Icons.lock_rounded, color: Colors.white70, size: 36),
-                      ),
+                      child: isUnlocked 
+                          ? Stack(
+                              children: [
+                                Center(
+                                  child: Text('${level.id}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white)),
+                                ),
+                                if (level.id < LevelData.maxUnlockedLevel || stars > 0)
+                                  Positioned(
+                                    bottom: 8,
+                                    left: 0,
+                                    right: 0,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: List.generate(3, (starIndex) {
+                                        return Icon(
+                                          Icons.star_rounded,
+                                          size: 16,
+                                          color: starIndex < stars ? Colors.white : Colors.black12,
+                                        );
+                                      }),
+                                    ),
+                                  ),
+                              ],
+                            )
+                          : const Center(
+                              child: Icon(Icons.lock_rounded, color: Colors.black26, size: 36),
+                            ),
                     ),
                   );
                 },

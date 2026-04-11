@@ -5,6 +5,7 @@ import '../core/game_settings.dart';
 import '../widgets/dot_widget.dart';
 import '../widgets/path_painter.dart';
 import '../widgets/game_button.dart';
+import '../widgets/animated_background.dart';
 import 'level_complete_screen.dart';
 import 'game_over_screen.dart';
 
@@ -23,7 +24,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
   List<int> path = [];
   bool isProcessing = false;
 
-  // New Hint Path System Variables
+  // Neon Hint Path System
   List<int> hintedPath = [];
   bool isHintActive = false;
   late AnimationController _hintPulseController;
@@ -51,14 +52,13 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     setState(() {});
   }
 
-  // Calculate full valid path using DFS
   void _executeHint() {
     List<int> bestPath = [];
     for (int i = 0; i < grid.length; i++) {
       if (grid[i] == Mood.happy) {
         List<int> currentPath = [i];
         _dfsFindPath(i, currentPath, bestPath);
-        if (bestPath.length >= 3) break; // If we find a solid path, stop searching
+        if (bestPath.length >= 3) break; 
       }
     }
     
@@ -208,139 +208,131 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     bool hasFreeHints = GameSettings.availableHints > 0;
 
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: Stack(
+        children: [
+          const AnimatedBackground(),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+              child: Column(
                 children: [
-                  GameIconButton(
-                    icon: Icons.pause_rounded, 
-                    color: AppTheme.accent, 
-                    shadowColor: AppTheme.accentDark,
-                    onTap: () => Navigator.pop(context), 
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      GameIconButton(icon: Icons.pause_rounded, color: AppTheme.accent, shadowColor: AppTheme.accentDark, onTap: () => Navigator.pop(context)),
+                      Text(topTitle, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
+                      GameIconButton(icon: Icons.refresh_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, onTap: _initLevel),
+                    ],
                   ),
-                  Text(topTitle, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
-                  GameIconButton(
-                    icon: Icons.refresh_rounded, 
-                    color: AppTheme.secondary, 
-                    shadowColor: AppTheme.secondaryDark,
-                    onTap: _initLevel,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                decoration: AppTheme.gameBoxDecoration,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text("MOVES LEFT: ", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textLight)),
-                    Text(
-                      "$movesLeft", 
-                      style: TextStyle(
-                        fontSize: 28, 
-                        fontWeight: FontWeight.w900, 
-                        color: movesLeft <= 3 ? AppTheme.accent : AppTheme.secondary
-                      )
+                  const SizedBox(height: 20),
+                  
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                    decoration: AppTheme.gameBoxDecoration,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text("MOVES LEFT: ", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textLight)),
+                        Text("$movesLeft", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: movesLeft <= 3 ? AppTheme.accent : AppTheme.secondary)),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 40),
+                  ),
+                  const SizedBox(height: 40),
 
-              Expanded(
-                child: Center(
-                  child: AspectRatio(
-                    aspectRatio: widget.level.cols / widget.level.rows,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return GestureDetector(
-                          onPanStart: (details) => _handlePanStart(details.localPosition, constraints.biggest),
-                          onPanUpdate: (details) => _handlePanUpdate(details.localPosition, constraints.biggest),
-                          onPanEnd: (_) => _triggerRipple(),
-                          child: Container(
-                            decoration: AppTheme.gameBoxDecoration,
-                            padding: const EdgeInsets.all(10),
-                            child: Stack(
-                              children: [
-                                // Pulsing Hint Path (Underneath user path)
-                                if (isHintActive && hintedPath.isNotEmpty)
-                                  AnimatedBuilder(
-                                    animation: _hintPulseController,
-                                    builder: (context, child) {
-                                      return CustomPaint(
+                  Expanded(
+                    child: Center(
+                      child: AspectRatio(
+                        aspectRatio: widget.level.cols / widget.level.rows,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return GestureDetector(
+                              onPanStart: (details) => _handlePanStart(details.localPosition, constraints.biggest),
+                              onPanUpdate: (details) => _handlePanUpdate(details.localPosition, constraints.biggest),
+                              onPanEnd: (_) => _triggerRipple(),
+                              child: Container(
+                                decoration: AppTheme.gameBoxDecoration,
+                                padding: const EdgeInsets.all(10),
+                                child: Stack(
+                                  children: [
+                                    // 1. Neon Pulsing Hint Path (Underneath)
+                                    if (isHintActive && hintedPath.isNotEmpty)
+                                      AnimatedBuilder(
+                                        animation: _hintPulseController,
+                                        builder: (context, child) {
+                                          return CustomPaint(
+                                            size: constraints.biggest,
+                                            painter: PathPainter(
+                                              path: hintedPath, 
+                                              cols: widget.level.cols, 
+                                              rows: widget.level.rows,
+                                              pathColor: AppTheme.neonBlue, 
+                                              strokeWidth: 20.0, 
+                                              isNeon: true,
+                                              pulseValue: _hintPulseController.value
+                                            ),
+                                          );
+                                        }
+                                      ),
+                                    
+                                    // 2. Solid Player Draw Path
+                                    if (path.isNotEmpty)
+                                      CustomPaint(
                                         size: constraints.biggest,
                                         painter: PathPainter(
-                                          path: hintedPath, 
+                                          path: path, 
                                           cols: widget.level.cols, 
                                           rows: widget.level.rows,
-                                          pathColor: AppTheme.primary.withOpacity(0.3 + (_hintPulseController.value * 0.6)), // Pulsing glow
-                                          strokeWidth: 24.0, // Thicker for hint
+                                          pathColor: Colors.white, 
+                                          strokeWidth: 18.0,
+                                          isNeon: false,
                                         ),
-                                      );
-                                    }
-                                  ),
-                                
-                                // Highly Visible User Drag Path
-                                CustomPaint(
-                                  size: constraints.biggest,
-                                  painter: PathPainter(
-                                    path: path, 
-                                    cols: widget.level.cols, 
-                                    rows: widget.level.rows,
-                                    pathColor: Colors.white, // Very visible solid white
-                                    strokeWidth: 16.0,
-                                  ),
-                                ),
-                                GridView.builder(
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: widget.level.cols,
-                                  ),
-                                  itemCount: grid.length,
-                                  itemBuilder: (context, index) {
-                                    return Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: DotWidget(
-                                        key: ValueKey(index),
-                                        mood: grid[index],
-                                        isInPath: path.contains(index),
-                                        isLast: path.isNotEmpty && path.last == index,
-                                        isHighlighted: false, // Hint highlight is now handled by PathPainter glow
                                       ),
-                                    );
-                                  },
+
+                                    // 3. The Grid
+                                    GridView.builder(
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: widget.level.cols),
+                                      itemCount: grid.length,
+                                      itemBuilder: (context, index) {
+                                        return Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: DotWidget(
+                                            key: ValueKey(index),
+                                            mood: grid[index],
+                                            isInPath: path.contains(index),
+                                            isLast: path.isNotEmpty && path.last == index,
+                                            isHighlighted: false, 
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
+                              ),
+                            );
+                          }
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  
+                  GameButton(
+                    title: hasFreeHints 
+                        ? 'USE HINT (${GameSettings.availableHints})' 
+                        : 'BUY HINT (${GameSettings.hintCost}🪙)',
+                    icon: Icons.lightbulb_rounded,
+                    color: hasFreeHints ? AppTheme.primary : AppTheme.coinGold,
+                    shadowColor: hasFreeHints ? AppTheme.primaryDark : AppTheme.coinDark,
+                    isSmall: true,
+                    onTap: _useHint,
+                  ),
+                  const SizedBox(height: 20),
+                ],
               ),
-              const SizedBox(height: 20),
-              
-              GameButton(
-                title: hasFreeHints 
-                    ? 'USE HINT (${GameSettings.availableHints})' 
-                    : 'BUY HINT (${GameSettings.hintCost}🪙)',
-                icon: Icons.lightbulb_rounded,
-                color: hasFreeHints ? AppTheme.primary : AppTheme.coinGold,
-                shadowColor: hasFreeHints ? AppTheme.primaryDark : AppTheme.coinDark,
-                isSmall: true,
-                onTap: _useHint,
-              ),
-              const SizedBox(height: 20),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
