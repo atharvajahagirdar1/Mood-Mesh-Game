@@ -1,5 +1,127 @@
 import os
 import sys
+import subprocess
+
+def add_flutter_dependencies():
+    print("\n📦 Installing required Flutter packages...")
+    packages = [
+        "shared_preferences", 
+        "audioplayers", 
+        "google_mobile_ads", 
+        "confetti"
+    ]
+    use_shell = os.name == 'nt'
+    for pkg in packages:
+        print(f"   Adding {pkg}...")
+        subprocess.run(["flutter", "pub", "add", pkg], check=True, shell=use_shell)
+        
+    print("   Adding flutter_launcher_icons...")
+    subprocess.run(["flutter", "pub", "add", "dev:flutter_launcher_icons"], check=True, shell=use_shell)
+
+def configure_pubspec():
+    print("\n📄 Configuring pubspec.yaml for assets and icons...")
+    if not os.path.exists("pubspec.yaml"): return
+    
+    with open("pubspec.yaml", "r", encoding="utf-8") as f:
+        content = f.read()
+        
+    # Auto-inject assets folder
+    if "assets/audio/" not in content:
+        if "\n  assets:\n" in content:
+            content = content.replace("\n  assets:\n", "\n  assets:\n    - assets/\n    - assets/audio/\n")
+        elif "\nflutter:\n" in content:
+            content = content.replace("\nflutter:\n", "\nflutter:\n  assets:\n    - assets/\n    - assets/audio/\n")
+            
+    # Auto-inject icon configuration
+    if "flutter_icons:" not in content:
+        content += "\n\nflutter_icons:\n  android: true\n  ios: true\n  image_path: \"assets/mood_mash_icon.png\"\n"
+        
+    with open("pubspec.yaml", "w", encoding="utf-8") as f:
+        f.write(content)
+    print("   ✅ pubspec.yaml configured.")
+
+def inject_admob_ids():
+    print("\n⚙️ Injecting AdMob Test App IDs into Manifests...")
+    
+    # 1. Android Manifest
+    android_manifest = os.path.join("android", "app", "src", "main", "AndroidManifest.xml")
+    if os.path.exists(android_manifest):
+        with open(android_manifest, "r", encoding='utf-8') as f:
+            content = f.read()
+        
+        if "com.google.android.gms.ads.APPLICATION_ID" not in content:
+            admob_meta = '\n        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>\n        <activity'
+            content = content.replace("<activity", admob_meta, 1) 
+            
+            with open(android_manifest, "w", encoding='utf-8') as f:
+                f.write(content)
+            print("   ✅ Android AdMob ID injected.")
+    
+    # 2. iOS Info.plist
+    ios_plist = os.path.join("ios", "Runner", "Info.plist")
+    if os.path.exists(ios_plist):
+        with open(ios_plist, "r", encoding='utf-8') as f:
+            content = f.read()
+            
+        if "GADApplicationIdentifier" not in content:
+            admob_key = '<dict>\n\t<key>GADApplicationIdentifier</key>\n\t<string>ca-app-pub-3940256099942544~1458002511</string>'
+            content = content.replace("<dict>", admob_key, 1)
+            
+            with open(ios_plist, "w", encoding='utf-8') as f:
+                f.write(content)
+            print("   ✅ iOS AdMob ID injected.")
+
+def configure_android_build():
+    print("\n🔧 Fixing Android Build Settings (minSdkVersion & ndkVersion)...")
+    
+    # Handle modern Flutter projects (Kotlin DSL)
+    kts_path = os.path.join("android", "app", "build.gradle.kts")
+    # Handle older Flutter projects (Groovy)
+    groovy_path = os.path.join("android", "app", "build.gradle")
+    
+    if os.path.exists(kts_path):
+        with open(kts_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        modified = False
+        
+        if "minSdk = flutter.minSdkVersion" in content:
+            content = content.replace("minSdk = flutter.minSdkVersion", "minSdk = 23")
+            modified = True
+        elif "minSdk = 21" in content:
+            content = content.replace("minSdk = 21", "minSdk = 23")
+            modified = True
+            
+        if "ndkVersion" not in content and "android {" in content:
+            content = content.replace("android {", "android {\n    ndkVersion = \"27.0.12077973\"", 1)
+            modified = True
+            
+        if modified:
+            with open(kts_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            print("   ✅ Android build.gradle.kts patched (minSdk=23, ndk=27.0.12077973).")
+            
+    elif os.path.exists(groovy_path):
+        with open(groovy_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        modified = False
+        
+        if "minSdkVersion flutter.minSdkVersion" in content:
+            content = content.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 23")
+            modified = True
+        elif "minSdkVersion 21" in content:
+            content = content.replace("minSdkVersion 21", "minSdkVersion 23")
+            modified = True
+            
+        if "ndkVersion" not in content and "android {" in content:
+            content = content.replace("android {", "android {\n    ndkVersion = \"27.0.12077973\"", 1)
+            modified = True
+            
+        if modified:
+            with open(groovy_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            print("   ✅ Android build.gradle patched (minSdkVersion=23, ndk=27.0.12077973).")
+    else:
+        print("   ⚠️ Could not find Android build.gradle files to patch.")
 
 def get_dart_files():
     """Returns a dictionary containing all production-level Dart files and their paths."""
@@ -8,11 +130,22 @@ def get_dart_files():
         "lib/main.dart": r"""
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'core/app_theme.dart';
+import 'core/storage_manager.dart';
+import 'core/audio_manager.dart';
+import 'core/ad_manager.dart';
 import 'screens/splash_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Core Services
+  await StorageManager.init();
+  await MobileAds.instance.initialize();
+  AudioManager.init();
+  AdManager.instance.loadRewardedAd();
+  
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((_) {
     runApp(const MoodMeshApp());
   });
@@ -32,7 +165,154 @@ class MoodMeshApp extends StatelessWidget {
   }
 }
 """,
+        "lib/core/storage_manager.dart": r"""
+import 'package:shared_preferences/shared_preferences.dart';
+import 'game_settings.dart';
+import 'level_data.dart';
 
+class StorageManager {
+  static late SharedPreferences _prefs;
+
+  static Future<void> init() async {
+    _prefs = await SharedPreferences.getInstance();
+    _loadData();
+  }
+
+  static void _loadData() {
+    GameSettings.totalCoins = _prefs.getInt('coins') ?? 0;
+    GameSettings.availableHints = _prefs.getInt('hints') ?? 5;
+    GameSettings.currentTheme = _prefs.getString('theme') ?? 'classic';
+    GameSettings.soundOn = _prefs.getBool('sound') ?? true;
+    GameSettings.musicOn = _prefs.getBool('music') ?? true;
+    GameSettings.hapticsOn = _prefs.getBool('haptics') ?? true;
+    GameSettings.lastDailyPuzzleDate = _prefs.getString('last_daily') ?? '';
+    LevelData.maxUnlockedLevel = _prefs.getInt('max_level') ?? 1;
+
+    for (int i = 1; i <= 200; i++) {
+      int? stars = _prefs.getInt('stars_$i');
+      if (stars != null) LevelData.levelStars[i] = stars;
+    }
+  }
+
+  static Future<void> saveSettings() async {
+    await _prefs.setString('theme', GameSettings.currentTheme);
+    await _prefs.setBool('sound', GameSettings.soundOn);
+    await _prefs.setBool('music', GameSettings.musicOn);
+    await _prefs.setBool('haptics', GameSettings.hapticsOn);
+  }
+
+  static Future<void> saveEconomy() async {
+    await _prefs.setInt('coins', GameSettings.totalCoins);
+    await _prefs.setInt('hints', GameSettings.availableHints);
+    await _prefs.setString('last_daily', GameSettings.lastDailyPuzzleDate);
+  }
+
+  static Future<void> saveProgress(int levelId, int stars) async {
+    await _prefs.setInt('max_level', LevelData.maxUnlockedLevel);
+    await _prefs.setInt('stars_$levelId', stars);
+  }
+}
+""",
+        "lib/core/audio_manager.dart": r"""
+import 'package:audioplayers/audioplayers.dart';
+import 'game_settings.dart';
+
+class AudioManager {
+  static final AudioPlayer _sfxPlayer = AudioPlayer();
+  static final AudioPlayer _bgmPlayer = AudioPlayer();
+
+  static void init() {
+    _bgmPlayer.setReleaseMode(ReleaseMode.loop);
+  }
+
+  static Future<void> playBgm() async {
+    if (!GameSettings.musicOn) return;
+    try {
+      await _bgmPlayer.play(AssetSource('audio/bgm.mp3'), volume: 0.5);
+    } catch (e) {
+      // Safe catch: App won't crash if bgm.mp3 is missing
+    }
+  }
+
+  static Future<void> stopBgm() async {
+    try {
+      await _bgmPlayer.stop();
+    } catch (e) {}
+  }
+
+  static Future<void> playPop() async {
+    if (!GameSettings.soundOn) return;
+    try {
+      await _sfxPlayer.play(AssetSource('audio/pop.mp3'), mode: PlayerMode.lowLatency);
+    } catch (e) {}
+  }
+
+  static Future<void> playWin() async {
+    if (!GameSettings.soundOn) return;
+    try {
+      await _sfxPlayer.play(AssetSource('audio/win.mp3'));
+    } catch (e) {}
+  }
+}
+""",
+        "lib/core/ad_manager.dart": r"""
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'dart:io' show Platform;
+
+class AdManager {
+  static final AdManager instance = AdManager._init();
+  AdManager._init();
+
+  RewardedAd? _rewardedAd;
+  bool isAdLoaded = false;
+
+  // Test Ad Unit IDs provided by Google
+  final String _androidRewardedId = 'ca-app-pub-3940256099942544/5224354917';
+  final String _iosRewardedId = 'ca-app-pub-3940256099942544/1712485313';
+
+  void loadRewardedAd() {
+    String adUnitId = Platform.isAndroid ? _androidRewardedId : _iosRewardedId;
+
+    RewardedAd.load(
+      adUnitId: adUnitId,
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          _rewardedAd = ad;
+          isAdLoaded = true;
+        },
+        onAdFailedToLoad: (error) {
+          isAdLoaded = false;
+          _rewardedAd = null;
+        },
+      ),
+    );
+  }
+
+  void showRewardedAd(Function onRewardEarned) {
+    if (_rewardedAd != null && isAdLoaded) {
+      _rewardedAd!.show(
+        onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
+          onRewardEarned();
+        },
+      );
+      
+      _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+        onAdDismissedFullScreenContent: (ad) {
+          ad.dispose();
+          loadRewardedAd(); // Load the next ad immediately
+        },
+        onAdFailedToShowFullScreenContent: (ad, error) {
+          ad.dispose();
+          loadRewardedAd();
+        },
+      );
+    } else {
+      loadRewardedAd();
+    }
+  }
+}
+""",
         "lib/core/app_theme.dart": r"""
 import 'package:flutter/material.dart';
 
@@ -64,10 +344,10 @@ class AppTheme {
   static const Color textLight = Color(0xFF748A9D);
   static const Color white = Colors.white;
 
-  // Mood Colors
-  static const Color moodHappy = Color(0xFFFFB703);
-  static const Color moodAngry = Color(0xFFFF595E);
-  static const Color moodSleepy = Color(0xFF4EA8DE);
+  // Vibrant Mood Colors (For the Dots)
+  static const Color moodHappy = Color(0xFFFFEA00); // Lemon Yellow
+  static const Color moodAngry = Color(0xFFFF3D00); // Neon Red
+  static const Color moodSleepy = Color(0xFF00E5FF); // Cyan Blue
 
   static ThemeData get lightTheme {
     return ThemeData(
@@ -106,7 +386,7 @@ class GameSettings {
   static int totalCoins = 0;
   static int availableHints = 5; 
   static const int hintCost = 20;
-  static String lastDailyPuzzleDate = ''; // Tracks when the player last completed the daily puzzle
+  static String lastDailyPuzzleDate = ''; 
 
   static String getEmoji(int moodIndex) {
     if (currentTheme == 'animals') return ['🐶', '🐯', '🐨'][moodIndex]; 
@@ -141,27 +421,112 @@ class Level {
 """,
 
         "lib/core/level_data.dart": r"""
+import 'dart:math';
 import '../models/level.dart';
 
 class LevelData {
   static int maxUnlockedLevel = 1;
-  static Map<int, int> levelStars = {}; // Store highest stars achieved per level
+  static Map<int, int> levelStars = {}; 
 
-  static final List<Level> allLevels = [
-    Level(id: 1, cols: 3, rows: 3, maxMoves: 5, movesFor3Stars: 4, movesFor2Stars: 2, initialGrid: [2, 2, 2, 0, 0, 0, 2, 2, 2]),
-    Level(id: 2, cols: 3, rows: 3, maxMoves: 6, movesFor3Stars: 4, movesFor2Stars: 2, initialGrid: [1, 1, 1, 0, 0, 0, 1, 1, 1]),
-    Level(id: 3, cols: 3, rows: 3, maxMoves: 5, movesFor3Stars: 4, movesFor2Stars: 2, initialGrid: [0, 2, 0, 0, 2, 0, 0, 2, 0]),
-    Level(id: 4, cols: 3, rows: 3, maxMoves: 8, movesFor3Stars: 6, movesFor2Stars: 3, initialGrid: [0, 1, 0, 0, 1, 0, 0, 1, 0]),
-    Level(id: 5, cols: 4, rows: 4, maxMoves: 12, movesFor3Stars: 8, movesFor2Stars: 4, initialGrid: [2, 2, 2, 2, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0]),
-    Level(id: 6, cols: 4, rows: 4, maxMoves: 15, movesFor3Stars: 10, movesFor2Stars: 5, initialGrid: [1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0]),
-    Level(id: 7, cols: 5, rows: 5, maxMoves: 20, movesFor3Stars: 15, movesFor2Stars: 8, initialGrid: [2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2]),
-    Level(id: 8, cols: 5, rows: 5, maxMoves: 25, movesFor3Stars: 18, movesFor2Stars: 10, initialGrid: [0, 2, 0, 2, 0, 0, 2, 0, 2, 0, 0, 2, 0, 2, 0, 0, 2, 0, 2, 0, 0, 2, 0, 2, 0]),
-  ];
+  static final List<Level> allLevels = List.generate(200, (index) => _generateLevel(index + 1));
 
-  static final Level dailyLevel = Level(
-    id: 999, cols: 5, rows: 5, maxMoves: 20, movesFor3Stars: 15, movesFor2Stars: 10, 
-    initialGrid: [2, 1, 2, 1, 2, 0, 0, 0, 0, 0, 2, 1, 2, 1, 2, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2]
-  );
+  static Level _generateLevel(int levelSeed, {int? overrideId, bool forceDaily = false}) {
+    Random rand = Random(levelSeed + 1000); 
+
+    int cols = 3, rows = 3;
+    if (forceDaily) {
+      cols = 5; rows = 5;
+    } else {
+      if (levelSeed > 10) { cols = 4; rows = 4; }
+      if (levelSeed > 50) { cols = 5; rows = 5; }
+      if (levelSeed > 120) { cols = 6; rows = 6; }
+    }
+
+    int chapter = forceDaily ? 10 : (levelSeed - 1) ~/ 10;
+    int levelInChapter = forceDaily ? 8 : (levelSeed - 1) % 10;
+    
+    int baseMoves = forceDaily ? 8 : 2 + (chapter * 0.7).toInt(); 
+    List<int> sawtooth = [0, 1, 1, 2, 2, 3, 4, 5, 6, -1]; 
+    int requiredMoves = baseMoves + sawtooth[levelInChapter];
+    if (requiredMoves < 1) requiredMoves = 1;
+
+    List<int> grid = List.filled(cols * rows, 0);
+
+    for (int m = 0; m < requiredMoves; m++) {
+      int pathLen = rand.nextInt(2) + 1; 
+      List<int> path = [];
+
+      List<int> happyDots = [];
+      for (int i = 0; i < grid.length; i++) {
+        if (grid[i] == 0) happyDots.add(i);
+      }
+      if (happyDots.isEmpty) break; 
+      
+      int startDot = happyDots[rand.nextInt(happyDots.length)];
+      path.add(startDot);
+
+      if (pathLen == 2) {
+        int r = startDot ~/ cols;
+        int c = startDot % cols;
+        List<int> neighbors = [];
+        if (r > 0) neighbors.add(startDot - cols);
+        if (r < rows - 1) neighbors.add(startDot + cols);
+        if (c > 0) neighbors.add(startDot - 1);
+        if (c < cols - 1) neighbors.add(startDot + 1);
+
+        List<int> happyNeighbors = neighbors.where((n) => grid[n] == 0).toList();
+        if (happyNeighbors.isNotEmpty) {
+          path.add(happyNeighbors[rand.nextInt(happyNeighbors.length)]);
+        }
+      }
+
+      Set<int> pathSet = path.toSet();
+      Set<int> neighborsToChange = {};
+
+      for (int idx in path) {
+        int r = idx ~/ cols;
+        int c = idx % cols;
+        List<List<int>> dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        for (var d in dirs) {
+          int nr = r + d[0], nc = c + d[1];
+          if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+            int nIdx = nr * cols + nc;
+            if (!pathSet.contains(nIdx)) neighborsToChange.add(nIdx);
+          }
+        }
+      }
+
+      for (int nIdx in neighborsToChange) {
+        grid[nIdx] = (grid[nIdx] + 2) % 3;
+      }
+    }
+
+    int maxMoves = forceDaily 
+        ? requiredMoves + 6 
+        : requiredMoves + 4 + (levelSeed ~/ 15); 
+    
+    if (levelSeed == 1 && !forceDaily) {
+      grid = [2, 2, 2, 0, 0, 0, 2, 2, 2];
+      requiredMoves = 1;
+      maxMoves = 5;
+    }
+
+    return Level(
+      id: overrideId ?? levelSeed,
+      cols: cols,
+      rows: rows,
+      maxMoves: maxMoves,
+      movesFor3Stars: requiredMoves,
+      movesFor2Stars: requiredMoves + (maxMoves - requiredMoves) ~/ 2,
+      initialGrid: grid,
+    );
+  }
+
+  static Level get dailyLevel {
+    DateTime now = DateTime.now();
+    int seed = now.year * 10000 + now.month * 100 + now.day;
+    return _generateLevel(seed, overrideId: 999, forceDaily: true);
+  }
 
   static void unlockNextLevel(int currentLevelId) {
     if (currentLevelId == maxUnlockedLevel && currentLevelId < allLevels.length) {
@@ -176,13 +541,64 @@ class LevelData {
   }
 
   static Level getLevel(int id) {
+    if (id == 999) return dailyLevel;
     return allLevels.firstWhere((lvl) => lvl.id == id);
+  }
+}
+""",
+
+        "lib/widgets/game_logo.dart": r"""
+import 'package:flutter/material.dart';
+import '../models/level.dart';
+import 'dot_widget.dart';
+import '../core/app_theme.dart';
+
+class GameLogoWidget extends StatelessWidget {
+  final double size;
+  const GameLogoWidget({Key? key, this.size = 200}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size * 0.65,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: size * 0.2, top: size * 0.25,
+            child: Container(
+              width: size * 0.6, height: size * 0.15,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: const [BoxShadow(color: AppTheme.neonBlue, blurRadius: 15, spreadRadius: 2)],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0, bottom: 0,
+            child: SizedBox(width: size*0.42, height: size*0.42, child: const DotWidget(mood: Mood.happy, isInPath: false, isLast: false)),
+          ),
+          Positioned(
+            left: size * 0.29, top: 0,
+            child: SizedBox(width: size*0.42, height: size*0.42, child: const DotWidget(mood: Mood.angry, isInPath: false, isLast: false)),
+          ),
+          Positioned(
+            right: 0, bottom: size * 0.05,
+            child: SizedBox(width: size*0.42, height: size*0.42, child: const DotWidget(mood: Mood.sleepy, isInPath: false, isLast: false)),
+          ),
+        ],
+      ),
+    );
   }
 }
 """,
 
         "lib/widgets/game_button.dart": r"""
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../core/game_settings.dart';
 
 class GameButton extends StatefulWidget {
   final String title;
@@ -223,11 +639,16 @@ class _GameButtonState extends State<GameButton> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  void _onTapDown(TapDownDetails details) => _controller.forward();
+  void _onTapDown(TapDownDetails details) {
+    if (GameSettings.hapticsOn) HapticFeedback.lightImpact();
+    _controller.forward();
+  }
+  
   void _onTapUp(TapUpDetails details) {
     _controller.reverse();
     widget.onTap();
   }
+  
   void _onTapCancel() => _controller.reverse();
 
   @override
@@ -292,7 +713,10 @@ class _GameIconButtonState extends State<GameIconButton> with SingleTickerProvid
     super.dispose();
   }
 
-  void _onTapDown(TapDownDetails details) => _controller.forward();
+  void _onTapDown(TapDownDetails details) {
+    if (GameSettings.hapticsOn) HapticFeedback.lightImpact();
+    _controller.forward();
+  }
   void _onTapUp(TapUpDetails details) { _controller.reverse(); widget.onTap(); }
   void _onTapCancel() => _controller.reverse();
 
@@ -322,7 +746,6 @@ class _GameIconButtonState extends State<GameIconButton> with SingleTickerProvid
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 
-// Simple, Minimalist Background
 class AnimatedBackground extends StatelessWidget {
   const AnimatedBackground({Key? key}) : super(key: key);
 
@@ -364,8 +787,9 @@ class AnimatedBackground extends StatelessWidget {
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import '../core/app_theme.dart';
-import '../core/game_settings.dart';
 import '../widgets/animated_background.dart';
+import '../widgets/game_logo.dart';
+import '../core/audio_manager.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -385,6 +809,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
     _controller.forward();
+    AudioManager.playBgm();
+    
     Future.delayed(const Duration(milliseconds: 2500), () {
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
     });
@@ -407,12 +833,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               scale: _scaleAnimation,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(GameSettings.getEmoji(0), style: const TextStyle(fontSize: 100)),
-                  const SizedBox(height: 20),
-                  const Text('Mood Mesh', style: TextStyle(fontSize: 46, fontWeight: FontWeight.w900, color: AppTheme.textDark, letterSpacing: 2.0)),
-                  const SizedBox(height: 10),
-                  const Text('Connect the emotions', style: TextStyle(fontSize: 18, color: AppTheme.textLight, fontWeight: FontWeight.bold)),
+                children: const [
+                  GameLogoWidget(size: 220), 
+                  SizedBox(height: 30),
+                  Text('Mood Mesh', style: TextStyle(fontSize: 46, fontWeight: FontWeight.w900, color: AppTheme.textDark, letterSpacing: 2.0)),
+                  SizedBox(height: 10),
+                  Text('Connect the emotions', style: TextStyle(fontSize: 18, color: AppTheme.textLight, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
@@ -434,7 +860,10 @@ import '../core/app_theme.dart';
 import '../core/level_data.dart';
 import '../widgets/game_button.dart';
 import '../core/game_settings.dart';
+import '../core/storage_manager.dart';
+import '../core/ad_manager.dart';
 import '../widgets/animated_background.dart';
+import '../widgets/game_logo.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -467,6 +896,21 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       Navigator.push(context, MaterialPageRoute(builder: (_) => GameScreen(level: LevelData.dailyLevel, isDaily: true))).then((_) => setState(() {})); 
     }
+  }
+
+  void _watchAdForCoins() {
+    if (!AdManager.instance.isAdLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ad is still loading. Please try again in a moment!')));
+      return;
+    }
+    
+    AdManager.instance.showRewardedAd(() {
+      setState(() {
+        GameSettings.totalCoins += 50;
+      });
+      StorageManager.saveEconomy();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reward Earned: +50 Coins!', style: TextStyle(fontWeight: FontWeight.bold))));
+    });
   }
 
   @override
@@ -517,18 +961,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: AppTheme.white,
-                          shape: BoxShape.circle,
-                          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 15, offset: Offset(0, 10))],
-                        ),
-                        child: Text(GameSettings.getEmoji(0), style: const TextStyle(fontSize: 120)),
-                      ),
-                      const SizedBox(height: 20),
+                      const GameLogoWidget(size: 180), 
+                      const SizedBox(height: 30),
                       const Text('Mood Mesh', style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: AppTheme.textDark, letterSpacing: -1.0)),
-                      const SizedBox(height: 60),
+                      const SizedBox(height: 50),
                       
                       GameButton(
                         title: 'PLAY LEVEL $currentLevel',
@@ -539,7 +975,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelSelectScreen())).then((_) => setState(() {})); 
                         },
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 15),
                       
                       GameButton(
                         title: 'DAILY PUZZLE',
@@ -547,6 +983,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: AppTheme.accent,
                         shadowColor: AppTheme.accentDark,
                         onTap: _playDailyPuzzle,
+                      ),
+                      const SizedBox(height: 15),
+                      
+                      GameButton(
+                        title: 'WATCH AD (+50🪙)',
+                        icon: Icons.ondemand_video_rounded,
+                        color: AppTheme.success,
+                        shadowColor: AppTheme.successDark,
+                        isSmall: true,
+                        onTap: _watchAdForCoins,
                       ),
                     ],
                   ),
@@ -581,6 +1027,7 @@ class _HomeScreenState extends State<HomeScreen> {
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/game_settings.dart';
+import '../core/storage_manager.dart';
 import '../widgets/animated_background.dart';
 
 class ThemesScreen extends StatefulWidget {
@@ -618,7 +1065,10 @@ class _ThemesScreenState extends State<ThemesScreen> {
                   final isSelected = !isLocked && GameSettings.currentTheme == theme['id'];
 
                   return GestureDetector(
-                    onTap: isLocked ? null : () => setState(() => GameSettings.currentTheme = theme['id']),
+                    onTap: isLocked ? null : () {
+                      setState(() => GameSettings.currentTheme = theme['id']);
+                      StorageManager.saveSettings();
+                    },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       decoration: BoxDecoration(
@@ -652,6 +1102,8 @@ class _ThemesScreenState extends State<ThemesScreen> {
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/game_settings.dart';
+import '../core/storage_manager.dart';
+import '../core/audio_manager.dart';
 import '../widgets/animated_background.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -679,11 +1131,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     decoration: AppTheme.gameBoxDecoration,
                     child: Column(
                       children: [
-                        _buildToggle('Sound Effects', Icons.volume_up_rounded, GameSettings.soundOn, (val) => setState(() => GameSettings.soundOn = val)),
+                        _buildToggle('Sound Effects', Icons.volume_up_rounded, GameSettings.soundOn, (val) {
+                          setState(() => GameSettings.soundOn = val);
+                          StorageManager.saveSettings();
+                        }),
                         const Divider(height: 1),
-                        _buildToggle('Music', Icons.music_note_rounded, GameSettings.musicOn, (val) => setState(() => GameSettings.musicOn = val)),
+                        _buildToggle('Music', Icons.music_note_rounded, GameSettings.musicOn, (val) {
+                          setState(() => GameSettings.musicOn = val);
+                          StorageManager.saveSettings();
+                          val ? AudioManager.playBgm() : AudioManager.stopBgm();
+                        }),
                         const Divider(height: 1),
-                        _buildToggle('Haptics', Icons.vibration_rounded, GameSettings.hapticsOn, (val) => setState(() => GameSettings.hapticsOn = val)),
+                        _buildToggle('Haptics', Icons.vibration_rounded, GameSettings.hapticsOn, (val) {
+                          setState(() => GameSettings.hapticsOn = val);
+                          StorageManager.saveSettings();
+                        }),
                       ],
                     ),
                   ),
@@ -709,9 +1171,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         "lib/screens/level_select_screen.dart": r"""
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'game_screen.dart';
 import '../core/app_theme.dart';
 import '../core/level_data.dart';
+import '../core/game_settings.dart';
 import '../widgets/animated_background.dart';
 
 class LevelSelectScreen extends StatefulWidget {
@@ -739,7 +1203,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                   crossAxisSpacing: 20,
                   mainAxisSpacing: 20,
                 ),
-                itemCount: LevelData.allLevels.length,
+                itemCount: LevelData.allLevels.length, 
                 itemBuilder: (context, index) {
                   final level = LevelData.allLevels[index];
                   final isUnlocked = level.id <= LevelData.maxUnlockedLevel;
@@ -747,6 +1211,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
 
                   return GestureDetector(
                     onTap: isUnlocked ? () async {
+                      if (GameSettings.hapticsOn) HapticFeedback.lightImpact();
                       await Navigator.push(context, MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: false)));
                       setState(() {}); 
                     } : null,
@@ -799,9 +1264,12 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
 
         "lib/screens/game_screen.dart": r"""
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/level.dart';
 import '../core/app_theme.dart';
 import '../core/game_settings.dart';
+import '../core/storage_manager.dart';
+import '../core/audio_manager.dart';
 import '../widgets/dot_widget.dart';
 import '../widgets/path_painter.dart';
 import '../widgets/game_button.dart';
@@ -824,7 +1292,6 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
   List<int> path = [];
   bool isProcessing = false;
 
-  // Neon Hint Path System
   List<int> hintedPath = [];
   bool isHintActive = false;
   late AnimationController _hintPulseController;
@@ -863,10 +1330,12 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     }
     
     if (bestPath.length > 1) {
+      AudioManager.playPop(); // Reusing pop for generic good notification
       setState(() {
         hintedPath = List.from(bestPath);
         isHintActive = true;
       });
+      StorageManager.saveEconomy(); // Save updated hints/coins
     }
   }
 
@@ -902,6 +1371,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       setState(() => GameSettings.totalCoins -= GameSettings.hintCost);
       _executeHint();
     } else {
+      if (GameSettings.hapticsOn) HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Not enough coins for a hint!', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -919,7 +1389,9 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       return;
     }
 
+    if (GameSettings.hapticsOn) HapticFeedback.mediumImpact();
     setState(() => isProcessing = true);
+    
     Set<int> pathSet = path.toSet();
     Set<int> neighborsToChange = {};
 
@@ -955,8 +1427,12 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
   void _checkWinLoss() {
     bool isWin = grid.every((mood) => mood == Mood.happy);
     if (isWin) {
+      AudioManager.playWin();
+      if (GameSettings.hapticsOn) HapticFeedback.vibrate();
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LevelCompleteScreen(level: widget.level, movesLeft: movesLeft, isDaily: widget.isDaily)));
     } else if (movesLeft <= 0) {
+      // Could add playLose() here if asset added
+      if (GameSettings.hapticsOn) HapticFeedback.heavyImpact();
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameOverScreen(level: widget.level, isDaily: widget.isDaily)));
     }
   }
@@ -983,12 +1459,17 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     int idx = r * widget.level.cols + c;
 
     if (path.isEmpty) {
-      if (grid[idx] == Mood.happy) setState(() => path.add(idx));
+      if (grid[idx] == Mood.happy) {
+        setState(() => path.add(idx));
+        if (GameSettings.hapticsOn) HapticFeedback.selectionClick();
+        AudioManager.playPop();
+      }
       return;
     }
 
     if (path.length > 1 && path[path.length - 2] == idx) {
       setState(() => path.removeLast());
+      if (GameSettings.hapticsOn) HapticFeedback.selectionClick();
       return;
     }
 
@@ -998,7 +1479,11 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       int lastC = lastIdx % widget.level.cols;
       bool isAdjacent = (r - lastR).abs() + (c - lastC).abs() == 1;
 
-      if (isAdjacent && grid[idx] == Mood.happy) setState(() => path.add(idx));
+      if (isAdjacent && grid[idx] == Mood.happy) {
+        setState(() => path.add(idx));
+        if (GameSettings.hapticsOn) HapticFeedback.selectionClick();
+        AudioManager.playPop();
+      }
     }
   }
 
@@ -1141,12 +1626,14 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
 
         "lib/screens/level_complete_screen.dart": r"""
 import 'package:flutter/material.dart';
+import 'package:confetti/confetti.dart';
 import 'game_screen.dart';
 import 'home_screen.dart';
 import '../models/level.dart';
 import '../core/app_theme.dart';
 import '../core/level_data.dart';
 import '../core/game_settings.dart';
+import '../core/storage_manager.dart';
 import '../widgets/game_button.dart';
 import '../widgets/animated_background.dart';
 
@@ -1169,19 +1656,20 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
   double _star2Scale = 0.0;
   double _star3Scale = 0.0;
 
+  late ConfettiController _confettiController;
+
   @override
   void initState() {
     super.initState();
+    _confettiController = ConfettiController(duration: const Duration(seconds: 3));
     
-    // Check if player is replaying a previously completed level
     if (!widget.isDaily && widget.level.id < LevelData.maxUnlockedLevel) {
       isReplay = true;
     }
 
-    // Performance-based Stars & Rewards Logic
     if (widget.movesLeft >= widget.level.movesFor3Stars) {
       targetStars = 3;
-      coinsEarned = isReplay ? 0 : 30; // 0 coins for replay!
+      coinsEarned = isReplay ? 0 : 30; 
     } else if (widget.movesLeft >= widget.level.movesFor2Stars) {
       targetStars = 2;
       coinsEarned = isReplay ? 0 : 20;
@@ -1194,7 +1682,6 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
       GameSettings.totalCoins += coinsEarned;
       LevelData.unlockNextLevel(widget.level.id);
     } else if (widget.isDaily && targetStars > 0) {
-      // Mark daily puzzle as done for today
       GameSettings.lastDailyPuzzleDate = DateTime.now().toIso8601String().split('T')[0];
       GameSettings.totalCoins += coinsEarned;
     }
@@ -1202,8 +1689,19 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
     if (!widget.isDaily) {
       LevelData.saveStars(widget.level.id, targetStars);
     }
+    
+    // Save to device
+    StorageManager.saveEconomy();
+    StorageManager.saveProgress(widget.level.id, targetStars);
 
+    _confettiController.play();
     _animateStars();
+  }
+  
+  @override
+  void dispose() {
+    _confettiController.dispose();
+    super.dispose();
   }
 
   void _animateStars() async {
@@ -1223,6 +1721,21 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
       body: Stack(
         children: [
           const AnimatedBackground(), 
+          
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConfettiWidget(
+              confettiController: _confettiController,
+              blastDirectionality: BlastDirectionality.explosive,
+              emissionFrequency: 0.05,
+              numberOfParticles: 20,
+              maxBlastForce: 100,
+              minBlastForce: 80,
+              gravity: 0.1,
+              colors: const [AppTheme.primary, AppTheme.secondary, AppTheme.accent, AppTheme.success],
+            ),
+          ),
+
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1234,10 +1747,8 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppTheme.success),
                 ),
-                
                 const SizedBox(height: 30),
                 
-                // Staggered Star Display
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -1251,7 +1762,6 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Animated Coin Reward System (or Replay Notice)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
                   decoration: BoxDecoration(color: AppTheme.white, borderRadius: BorderRadius.circular(30), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))], border: Border.all(color: const Color(0xFFE5E9F0), width: 2)),
@@ -1298,7 +1808,7 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
                   children: [
                     GameButton(title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, isSmall: true, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()))),
                     const SizedBox(width: 15),
-                    if (!widget.isDaily) // Replaying daily puzzle instantly might not be wanted if it's once a day
+                    if (!widget.isDaily) 
                       GameButton(title: 'REPLAY', icon: Icons.replay_rounded, color: AppTheme.primary, shadowColor: AppTheme.primaryDark, isSmall: true, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily)))),
                   ],
                 )
@@ -1318,13 +1828,36 @@ import 'game_screen.dart';
 import 'home_screen.dart';
 import '../models/level.dart';
 import '../core/app_theme.dart';
+import '../core/ad_manager.dart';
+import '../core/game_settings.dart';
+import '../core/storage_manager.dart';
 import '../widgets/game_button.dart';
 import '../widgets/animated_background.dart';
 
-class GameOverScreen extends StatelessWidget {
+class GameOverScreen extends StatefulWidget {
   final Level level;
   final bool isDaily;
   const GameOverScreen({Key? key, required this.level, required this.isDaily}) : super(key: key);
+
+  @override
+  State<GameOverScreen> createState() => _GameOverScreenState();
+}
+
+class _GameOverScreenState extends State<GameOverScreen> {
+  void _watchAdForCoins() {
+    if (!AdManager.instance.isAdLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ad is still loading. Please try again in a moment!')));
+      return;
+    }
+    
+    AdManager.instance.showRewardedAd(() {
+      setState(() {
+        GameSettings.totalCoins += 50;
+      });
+      StorageManager.saveEconomy();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reward Earned: +50 Coins! Buy hints with them.', style: TextStyle(fontWeight: FontWeight.bold))));
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1345,13 +1878,24 @@ class GameOverScreen extends StatelessWidget {
 
                 GameButton(
                   title: 'TRY AGAIN', icon: Icons.refresh_rounded, color: AppTheme.accent, shadowColor: AppTheme.accentDark,
-                  onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: isDaily))),
+                  onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily))),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 15),
                 
                 GameButton(
                   title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark,
                   onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen())),
+                ),
+                const SizedBox(height: 30),
+
+                // Monetization Button
+                GameButton(
+                  title: 'WATCH AD (+50🪙)',
+                  icon: Icons.ondemand_video_rounded,
+                  color: AppTheme.success,
+                  shadowColor: AppTheme.successDark,
+                  isSmall: true,
+                  onTap: _watchAdForCoins,
                 ),
               ],
             ),
@@ -1449,7 +1993,6 @@ class PathPainter extends CustomPainter {
     double cellWidth = size.width / cols;
     double cellHeight = size.height / rows;
     
-    // Construct single Path object for clean joints
     Path fullPath = Path();
     for (int i = 0; i < path.length - 1; i++) {
       int p1 = path[i];
@@ -1463,7 +2006,6 @@ class PathPainter extends CustomPainter {
     }
 
     if (isNeon) {
-      // 1. Neon Outer Glow
       final glowPaint = Paint()
         ..color = pathColor.withOpacity(0.4 + (pulseValue * 0.6))
         ..strokeWidth = strokeWidth * 1.5
@@ -1473,7 +2015,6 @@ class PathPainter extends CustomPainter {
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, 10 + (pulseValue * 10));
       canvas.drawPath(fullPath, glowPaint);
 
-      // 2. Bright Neon Core
       final corePaint = Paint()
         ..color = Colors.white
         ..strokeWidth = strokeWidth * 0.4
@@ -1483,7 +2024,6 @@ class PathPainter extends CustomPainter {
       canvas.drawPath(fullPath, corePaint);
       
     } else {
-      // 1. Normal Path Shadow
       final shadowPaint = Paint()
         ..color = Colors.black26
         ..strokeWidth = strokeWidth
@@ -1493,7 +2033,6 @@ class PathPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
       canvas.drawPath(fullPath, shadowPaint);
 
-      // 2. Normal Solid Player Line
       final normalPaint = Paint()
         ..color = pathColor
         ..strokeWidth = strokeWidth
@@ -1516,6 +2055,20 @@ def inject_files():
         print("Please place and run this script inside the root directory of your existing Flutter project.")
         sys.exit(1)
 
+    os.makedirs("assets/audio", exist_ok=True)
+    
+    # 1. Install all required dependencies
+    add_flutter_dependencies()
+    
+    # Configure pubspec.yaml for icons and assets
+    configure_pubspec()
+    
+    # 2. Inject Google AdMob Test IDs to prevent launch crashes
+    inject_admob_ids()
+    
+    # 3. FIX ANDROID BUILD CONFIGURATION (minSdkVersion & ndkVersion)
+    configure_android_build()
+
     print("\n📦 Injecting PRODUCTION GAME ARCHITECTURE into the current project...")
     
     dart_files = get_dart_files()
@@ -1534,10 +2087,21 @@ def inject_files():
         os.remove(test_file)
         print("  🧹 Cleaned up default test file to prevent compile errors.")
 
-    print("\n🎉 INJECTION COMPLETE! Your game UI is now fully upgraded.")
+    if os.path.exists("assets/mood_mash_icon.png"):
+        print("\n🖼️ Generating native app icons...")
+        subprocess.run(["flutter", "pub", "run", "flutter_launcher_icons"], check=True, shell=(os.name=='nt'))
+    else:
+        print("\n⚠️ Note: assets/mood_mash_icon.png not found. Please place it in the assets folder later and run 'flutter pub run flutter_launcher_icons'.")
+
+    print("\n🧹 Cleaning and building project (this may take a minute)...")
+    subprocess.run(["flutter", "clean"], check=True, shell=(os.name=='nt'))
+    subprocess.run(["flutter", "pub", "get"], check=True, shell=(os.name=='nt'))
+
+    print("\n🎉 INJECTION COMPLETE! ALL BUILD FIXES AND 6 PRODUCTION ITEMS ARE IMPLEMENTED.")
     print("-" * 50)
-    print("To run your game, execute the following command in your terminal:")
-    print("  flutter clean && flutter pub get && flutter run")
+    print("To run your fully monetized, saving, audio-ready game, execute:")
+    print("  flutter run")
+    print("\nNote on Audio: Don't forget to drop your actual .mp3 files into the assets/audio folder!")
     print("-" * 50)
 
 if __name__ == "__main__":

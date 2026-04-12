@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../core/game_settings.dart';
 
 class GameButton extends StatefulWidget {
   final String title;
@@ -39,11 +41,16 @@ class _GameButtonState extends State<GameButton> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  void _onTapDown(TapDownDetails details) => _controller.forward();
+  void _onTapDown(TapDownDetails details) {
+    if (GameSettings.hapticsOn) HapticFeedback.lightImpact();
+    _controller.forward();
+  }
+  
   void _onTapUp(TapUpDetails details) {
     _controller.reverse();
     widget.onTap();
   }
+  
   void _onTapCancel() => _controller.reverse();
 
   @override
@@ -108,7 +115,10 @@ class _GameIconButtonState extends State<GameIconButton> with SingleTickerProvid
     super.dispose();
   }
 
-  void _onTapDown(TapDownDetails details) => _controller.forward();
+  void _onTapDown(TapDownDetails details) {
+    if (GameSettings.hapticsOn) HapticFeedback.lightImpact();
+    _controller.forward();
+  }
   void _onTapUp(TapUpDetails details) { _controller.reverse(); widget.onTap(); }
   void _onTapCancel() => _controller.reverse();
 

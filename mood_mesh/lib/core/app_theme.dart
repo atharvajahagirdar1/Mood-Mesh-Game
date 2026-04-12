@@ -28,10 +28,10 @@ class AppTheme {
   static const Color textLight = Color(0xFF748A9D);
   static const Color white = Colors.white;
 
-  // Mood Colors
-  static const Color moodHappy = Color(0xFFFFB703);
-  static const Color moodAngry = Color(0xFFFF595E);
-  static const Color moodSleepy = Color(0xFF4EA8DE);
+  // Vibrant Mood Colors (For the Dots)
+  static const Color moodHappy = Color(0xFFFFEA00); // Lemon Yellow
+  static const Color moodAngry = Color(0xFFFF3D00); // Neon Red
+  static const Color moodSleepy = Color(0xFF00E5FF); // Cyan Blue
 
   static ThemeData get lightTheme {
     return ThemeData(

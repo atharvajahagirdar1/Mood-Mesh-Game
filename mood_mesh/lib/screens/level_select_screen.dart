@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'game_screen.dart';
 import '../core/app_theme.dart';
 import '../core/level_data.dart';
+import '../core/game_settings.dart';
 import '../widgets/animated_background.dart';
 
 class LevelSelectScreen extends StatefulWidget {
@@ -29,7 +31,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                   crossAxisSpacing: 20,
                   mainAxisSpacing: 20,
                 ),
-                itemCount: LevelData.allLevels.length,
+                itemCount: LevelData.allLevels.length, 
                 itemBuilder: (context, index) {
                   final level = LevelData.allLevels[index];
                   final isUnlocked = level.id <= LevelData.maxUnlockedLevel;
@@ -37,6 +39,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
 
                   return GestureDetector(
                     onTap: isUnlocked ? () async {
+                      if (GameSettings.hapticsOn) HapticFeedback.lightImpact();
                       await Navigator.push(context, MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: false)));
                       setState(() {}); 
                     } : null,

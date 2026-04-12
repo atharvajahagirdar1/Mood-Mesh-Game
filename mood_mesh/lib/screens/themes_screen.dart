@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/game_settings.dart';
+import '../core/storage_manager.dart';
 import '../widgets/animated_background.dart';
 
 class ThemesScreen extends StatefulWidget {
@@ -38,7 +39,10 @@ class _ThemesScreenState extends State<ThemesScreen> {
                   final isSelected = !isLocked && GameSettings.currentTheme == theme['id'];
 
                   return GestureDetector(
-                    onTap: isLocked ? null : () => setState(() => GameSettings.currentTheme = theme['id']),
+                    onTap: isLocked ? null : () {
+                      setState(() => GameSettings.currentTheme = theme['id']);
+                      StorageManager.saveSettings();
+                    },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       decoration: BoxDecoration(

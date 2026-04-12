@@ -3,13 +3,36 @@ import 'game_screen.dart';
 import 'home_screen.dart';
 import '../models/level.dart';
 import '../core/app_theme.dart';
+import '../core/ad_manager.dart';
+import '../core/game_settings.dart';
+import '../core/storage_manager.dart';
 import '../widgets/game_button.dart';
 import '../widgets/animated_background.dart';
 
-class GameOverScreen extends StatelessWidget {
+class GameOverScreen extends StatefulWidget {
   final Level level;
   final bool isDaily;
   const GameOverScreen({Key? key, required this.level, required this.isDaily}) : super(key: key);
+
+  @override
+  State<GameOverScreen> createState() => _GameOverScreenState();
+}
+
+class _GameOverScreenState extends State<GameOverScreen> {
+  void _watchAdForCoins() {
+    if (!AdManager.instance.isAdLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ad is still loading. Please try again in a moment!')));
+      return;
+    }
+    
+    AdManager.instance.showRewardedAd(() {
+      setState(() {
+        GameSettings.totalCoins += 50;
+      });
+      StorageManager.saveEconomy();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reward Earned: +50 Coins! Buy hints with them.', style: TextStyle(fontWeight: FontWeight.bold))));
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,13 +53,24 @@ class GameOverScreen extends StatelessWidget {
 
                 GameButton(
                   title: 'TRY AGAIN', icon: Icons.refresh_rounded, color: AppTheme.accent, shadowColor: AppTheme.accentDark,
-                  onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: isDaily))),
+                  onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily))),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 15),
                 
                 GameButton(
                   title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark,
                   onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen())),
+                ),
+                const SizedBox(height: 30),
+
+                // Monetization Button
+                GameButton(
+                  title: 'WATCH AD (+50🪙)',
+                  icon: Icons.ondemand_video_rounded,
+                  color: AppTheme.success,
+                  shadowColor: AppTheme.successDark,
+                  isSmall: true,
+                  onTap: _watchAdForCoins,
                 ),
               ],
             ),

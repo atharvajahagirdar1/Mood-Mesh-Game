@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import '../core/app_theme.dart';
-import '../core/game_settings.dart';
 import '../widgets/animated_background.dart';
+import '../widgets/game_logo.dart';
+import '../core/audio_manager.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -22,6 +23,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
     _controller.forward();
+    AudioManager.playBgm();
+    
     Future.delayed(const Duration(milliseconds: 2500), () {
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
     });
@@ -44,12 +47,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               scale: _scaleAnimation,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(GameSettings.getEmoji(0), style: const TextStyle(fontSize: 100)),
-                  const SizedBox(height: 20),
-                  const Text('Mood Mesh', style: TextStyle(fontSize: 46, fontWeight: FontWeight.w900, color: AppTheme.textDark, letterSpacing: 2.0)),
-                  const SizedBox(height: 10),
-                  const Text('Connect the emotions', style: TextStyle(fontSize: 18, color: AppTheme.textLight, fontWeight: FontWeight.bold)),
+                children: const [
+                  GameLogoWidget(size: 220), 
+                  SizedBox(height: 30),
+                  Text('Mood Mesh', style: TextStyle(fontSize: 46, fontWeight: FontWeight.w900, color: AppTheme.textDark, letterSpacing: 2.0)),
+                  SizedBox(height: 10),
+                  Text('Connect the emotions', style: TextStyle(fontSize: 18, color: AppTheme.textLight, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),

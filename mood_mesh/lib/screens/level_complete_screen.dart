@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:confetti/confetti.dart';
 import 'game_screen.dart';
 import 'home_screen.dart';
 import '../models/level.dart';
 import '../core/app_theme.dart';
 import '../core/level_data.dart';
 import '../core/game_settings.dart';
+import '../core/storage_manager.dart';
 import '../widgets/game_button.dart';
 import '../widgets/animated_background.dart';
 
@@ -27,19 +29,20 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
   double _star2Scale = 0.0;
   double _star3Scale = 0.0;
 
+  late ConfettiController _confettiController;
+
   @override
   void initState() {
     super.initState();
+    _confettiController = ConfettiController(duration: const Duration(seconds: 3));
     
-    // Check if player is replaying a previously completed level
     if (!widget.isDaily && widget.level.id < LevelData.maxUnlockedLevel) {
       isReplay = true;
     }
 
-    // Performance-based Stars & Rewards Logic
     if (widget.movesLeft >= widget.level.movesFor3Stars) {
       targetStars = 3;
-      coinsEarned = isReplay ? 0 : 30; // 0 coins for replay!
+      coinsEarned = isReplay ? 0 : 30; 
     } else if (widget.movesLeft >= widget.level.movesFor2Stars) {
       targetStars = 2;
       coinsEarned = isReplay ? 0 : 20;
@@ -52,7 +55,6 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
       GameSettings.totalCoins += coinsEarned;
       LevelData.unlockNextLevel(widget.level.id);
     } else if (widget.isDaily && targetStars > 0) {
-      // Mark daily puzzle as done for today
       GameSettings.lastDailyPuzzleDate = DateTime.now().toIso8601String().split('T')[0];
       GameSettings.totalCoins += coinsEarned;
     }
@@ -60,8 +62,19 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
     if (!widget.isDaily) {
       LevelData.saveStars(widget.level.id, targetStars);
     }
+    
+    // Save to device
+    StorageManager.saveEconomy();
+    StorageManager.saveProgress(widget.level.id, targetStars);
 
+    _confettiController.play();
     _animateStars();
+  }
+  
+  @override
+  void dispose() {
+    _confettiController.dispose();
+    super.dispose();
   }
 
   void _animateStars() async {
@@ -81,6 +94,21 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
       body: Stack(
         children: [
           const AnimatedBackground(), 
+          
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConfettiWidget(
+              confettiController: _confettiController,
+              blastDirectionality: BlastDirectionality.explosive,
+              emissionFrequency: 0.05,
+              numberOfParticles: 20,
+              maxBlastForce: 100,
+              minBlastForce: 80,
+              gravity: 0.1,
+              colors: const [AppTheme.primary, AppTheme.secondary, AppTheme.accent, AppTheme.success],
+            ),
+          ),
+
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -92,10 +120,8 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppTheme.success),
                 ),
-                
                 const SizedBox(height: 30),
                 
-                // Staggered Star Display
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -109,7 +135,6 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Animated Coin Reward System (or Replay Notice)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
                   decoration: BoxDecoration(color: AppTheme.white, borderRadius: BorderRadius.circular(30), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))], border: Border.all(color: const Color(0xFFE5E9F0), width: 2)),
@@ -156,7 +181,7 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
                   children: [
                     GameButton(title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, isSmall: true, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()))),
                     const SizedBox(width: 15),
-                    if (!widget.isDaily) // Replaying daily puzzle instantly might not be wanted if it's once a day
+                    if (!widget.isDaily) 
                       GameButton(title: 'REPLAY', icon: Icons.replay_rounded, color: AppTheme.primary, shadowColor: AppTheme.primaryDark, isSmall: true, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily)))),
                   ],
                 )

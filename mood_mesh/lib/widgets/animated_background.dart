@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 
-// Simple, Minimalist Background
 class AnimatedBackground extends StatelessWidget {
   const AnimatedBackground({Key? key}) : super(key: key);
 

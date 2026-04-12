@@ -8,7 +8,7 @@ class GameSettings {
   static int totalCoins = 0;
   static int availableHints = 5; 
   static const int hintCost = 20;
-  static String lastDailyPuzzleDate = ''; // Tracks when the player last completed the daily puzzle
+  static String lastDailyPuzzleDate = ''; 
 
   static String getEmoji(int moodIndex) {
     if (currentTheme == 'animals') return ['🐶', '🐯', '🐨'][moodIndex]; 

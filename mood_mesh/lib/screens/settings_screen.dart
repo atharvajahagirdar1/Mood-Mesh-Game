@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/game_settings.dart';
+import '../core/storage_manager.dart';
+import '../core/audio_manager.dart';
 import '../widgets/animated_background.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -28,11 +30,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     decoration: AppTheme.gameBoxDecoration,
                     child: Column(
                       children: [
-                        _buildToggle('Sound Effects', Icons.volume_up_rounded, GameSettings.soundOn, (val) => setState(() => GameSettings.soundOn = val)),
+                        _buildToggle('Sound Effects', Icons.volume_up_rounded, GameSettings.soundOn, (val) {
+                          setState(() => GameSettings.soundOn = val);
+                          StorageManager.saveSettings();
+                        }),
                         const Divider(height: 1),
-                        _buildToggle('Music', Icons.music_note_rounded, GameSettings.musicOn, (val) => setState(() => GameSettings.musicOn = val)),
+                        _buildToggle('Music', Icons.music_note_rounded, GameSettings.musicOn, (val) {
+                          setState(() => GameSettings.musicOn = val);
+                          StorageManager.saveSettings();
+                          val ? AudioManager.playBgm() : AudioManager.stopBgm();
+                        }),
                         const Divider(height: 1),
-                        _buildToggle('Haptics', Icons.vibration_rounded, GameSettings.hapticsOn, (val) => setState(() => GameSettings.hapticsOn = val)),
+                        _buildToggle('Haptics', Icons.vibration_rounded, GameSettings.hapticsOn, (val) {
+                          setState(() => GameSettings.hapticsOn = val);
+                          StorageManager.saveSettings();
+                        }),
                       ],
                     ),
                   ),

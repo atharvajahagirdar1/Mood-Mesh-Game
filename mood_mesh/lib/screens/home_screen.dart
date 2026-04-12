@@ -7,7 +7,10 @@ import '../core/app_theme.dart';
 import '../core/level_data.dart';
 import '../widgets/game_button.dart';
 import '../core/game_settings.dart';
+import '../core/storage_manager.dart';
+import '../core/ad_manager.dart';
 import '../widgets/animated_background.dart';
+import '../widgets/game_logo.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -40,6 +43,21 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       Navigator.push(context, MaterialPageRoute(builder: (_) => GameScreen(level: LevelData.dailyLevel, isDaily: true))).then((_) => setState(() {})); 
     }
+  }
+
+  void _watchAdForCoins() {
+    if (!AdManager.instance.isAdLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ad is still loading. Please try again in a moment!')));
+      return;
+    }
+    
+    AdManager.instance.showRewardedAd(() {
+      setState(() {
+        GameSettings.totalCoins += 50;
+      });
+      StorageManager.saveEconomy();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reward Earned: +50 Coins!', style: TextStyle(fontWeight: FontWeight.bold))));
+    });
   }
 
   @override
@@ -90,18 +108,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: AppTheme.white,
-                          shape: BoxShape.circle,
-                          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 15, offset: Offset(0, 10))],
-                        ),
-                        child: Text(GameSettings.getEmoji(0), style: const TextStyle(fontSize: 120)),
-                      ),
-                      const SizedBox(height: 20),
+                      const GameLogoWidget(size: 180), 
+                      const SizedBox(height: 30),
                       const Text('Mood Mesh', style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: AppTheme.textDark, letterSpacing: -1.0)),
-                      const SizedBox(height: 60),
+                      const SizedBox(height: 50),
                       
                       GameButton(
                         title: 'PLAY LEVEL $currentLevel',
@@ -112,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelSelectScreen())).then((_) => setState(() {})); 
                         },
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 15),
                       
                       GameButton(
                         title: 'DAILY PUZZLE',
@@ -120,6 +130,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: AppTheme.accent,
                         shadowColor: AppTheme.accentDark,
                         onTap: _playDailyPuzzle,
+                      ),
+                      const SizedBox(height: 15),
+                      
+                      GameButton(
+                        title: 'WATCH AD (+50🪙)',
+                        icon: Icons.ondemand_video_rounded,
+                        color: AppTheme.success,
+                        shadowColor: AppTheme.successDark,
+                        isSmall: true,
+                        onTap: _watchAdForCoins,
                       ),
                     ],
                   ),
