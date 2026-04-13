@@ -24,13 +24,10 @@ class _GameOverScreenState extends State<GameOverScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ad is still loading. Please try again in a moment!')));
       return;
     }
-    
     AdManager.instance.showRewardedAd(() {
-      setState(() {
-        GameSettings.totalCoins += 50;
-      });
+      setState(() => GameSettings.totalCoins += 10);
       StorageManager.saveEconomy();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reward Earned: +50 Coins! Buy hints with them.', style: TextStyle(fontWeight: FontWeight.bold))));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reward Earned: +10 Coins! Buy hints with them.', style: TextStyle(fontWeight: FontWeight.bold))));
     });
   }
 
@@ -51,27 +48,11 @@ class _GameOverScreenState extends State<GameOverScreen> {
                 const Text('Don\'t give up! Try a different path.', style: TextStyle(fontSize: 18, color: AppTheme.textDark, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 60),
 
-                GameButton(
-                  title: 'TRY AGAIN', icon: Icons.refresh_rounded, color: AppTheme.accent, shadowColor: AppTheme.accentDark,
-                  onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily))),
-                ),
+                GameButton(title: 'TRY AGAIN', icon: Icons.refresh_rounded, color: AppTheme.accent, shadowColor: AppTheme.accentDark, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily)))),
                 const SizedBox(height: 15),
-                
-                GameButton(
-                  title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark,
-                  onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen())),
-                ),
+                GameButton(title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()))),
                 const SizedBox(height: 30),
-
-                // Monetization Button
-                GameButton(
-                  title: 'WATCH AD (+50🪙)',
-                  icon: Icons.ondemand_video_rounded,
-                  color: AppTheme.success,
-                  shadowColor: AppTheme.successDark,
-                  isSmall: true,
-                  onTap: _watchAdForCoins,
-                ),
+                GameButton(title: 'WATCH AD (+10🪙)', icon: Icons.ondemand_video_rounded, color: AppTheme.success, shadowColor: AppTheme.successDark, isSmall: true, onTap: _watchAdForCoins),
               ],
             ),
           ),

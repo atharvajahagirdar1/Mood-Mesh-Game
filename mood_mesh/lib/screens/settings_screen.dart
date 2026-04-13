@@ -31,17 +31,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Column(
                       children: [
                         _buildToggle('Sound Effects', Icons.volume_up_rounded, GameSettings.soundOn, (val) {
+                          AudioManager.playClick();
                           setState(() => GameSettings.soundOn = val);
                           StorageManager.saveSettings();
                         }),
                         const Divider(height: 1),
                         _buildToggle('Music', Icons.music_note_rounded, GameSettings.musicOn, (val) {
+                          AudioManager.playClick();
                           setState(() => GameSettings.musicOn = val);
                           StorageManager.saveSettings();
                           val ? AudioManager.playBgm() : AudioManager.stopBgm();
                         }),
                         const Divider(height: 1),
                         _buildToggle('Haptics', Icons.vibration_rounded, GameSettings.hapticsOn, (val) {
+                          AudioManager.playClick();
                           setState(() => GameSettings.hapticsOn = val);
                           StorageManager.saveSettings();
                         }),

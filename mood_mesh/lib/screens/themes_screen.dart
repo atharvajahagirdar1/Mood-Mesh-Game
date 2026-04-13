@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/game_settings.dart';
 import '../core/storage_manager.dart';
+import '../core/audio_manager.dart';
 import '../widgets/animated_background.dart';
 
 class ThemesScreen extends StatefulWidget {
@@ -40,6 +41,7 @@ class _ThemesScreenState extends State<ThemesScreen> {
 
                   return GestureDetector(
                     onTap: isLocked ? null : () {
+                      AudioManager.playClick();
                       setState(() => GameSettings.currentTheme = theme['id']);
                       StorageManager.saveSettings();
                     },

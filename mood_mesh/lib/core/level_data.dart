@@ -11,9 +11,7 @@ class LevelData {
     Random rand = Random(levelSeed + 1000); 
 
     int cols = 3, rows = 3;
-    if (forceDaily) {
-      cols = 5; rows = 5;
-    } else {
+    if (forceDaily) { cols = 5; rows = 5; } else {
       if (levelSeed > 10) { cols = 4; rows = 4; }
       if (levelSeed > 50) { cols = 5; rows = 5; }
       if (levelSeed > 120) { cols = 6; rows = 6; }
@@ -52,9 +50,7 @@ class LevelData {
         if (c < cols - 1) neighbors.add(startDot + 1);
 
         List<int> happyNeighbors = neighbors.where((n) => grid[n] == 0).toList();
-        if (happyNeighbors.isNotEmpty) {
-          path.add(happyNeighbors[rand.nextInt(happyNeighbors.length)]);
-        }
+        if (happyNeighbors.isNotEmpty) { path.add(happyNeighbors[rand.nextInt(happyNeighbors.length)]); }
       }
 
       Set<int> pathSet = path.toSet();
@@ -73,29 +69,15 @@ class LevelData {
         }
       }
 
-      for (int nIdx in neighborsToChange) {
-        grid[nIdx] = (grid[nIdx] + 2) % 3;
-      }
+      for (int nIdx in neighborsToChange) { grid[nIdx] = (grid[nIdx] + 2) % 3; }
     }
 
-    int maxMoves = forceDaily 
-        ? requiredMoves + 6 
-        : requiredMoves + 4 + (levelSeed ~/ 15); 
-    
-    if (levelSeed == 1 && !forceDaily) {
-      grid = [2, 2, 2, 0, 0, 0, 2, 2, 2];
-      requiredMoves = 1;
-      maxMoves = 5;
-    }
+    int maxMoves = forceDaily ? requiredMoves + 6 : requiredMoves + 4 + (levelSeed ~/ 15); 
+    if (levelSeed == 1 && !forceDaily) { grid = [2, 2, 2, 0, 0, 0, 2, 2, 2]; requiredMoves = 1; maxMoves = 5; }
 
     return Level(
-      id: overrideId ?? levelSeed,
-      cols: cols,
-      rows: rows,
-      maxMoves: maxMoves,
-      movesFor3Stars: requiredMoves,
-      movesFor2Stars: requiredMoves + (maxMoves - requiredMoves) ~/ 2,
-      initialGrid: grid,
+      id: overrideId ?? levelSeed, cols: cols, rows: rows, maxMoves: maxMoves,
+      movesFor3Stars: requiredMoves, movesFor2Stars: requiredMoves + (maxMoves - requiredMoves) ~/ 2, initialGrid: grid,
     );
   }
 
@@ -106,15 +88,11 @@ class LevelData {
   }
 
   static void unlockNextLevel(int currentLevelId) {
-    if (currentLevelId == maxUnlockedLevel && currentLevelId < allLevels.length) {
-      maxUnlockedLevel++;
-    }
+    if (currentLevelId == maxUnlockedLevel && currentLevelId < allLevels.length) maxUnlockedLevel++;
   }
 
   static void saveStars(int levelId, int stars) {
-    if (!levelStars.containsKey(levelId) || stars > levelStars[levelId]!) {
-      levelStars[levelId] = stars;
-    }
+    if (!levelStars.containsKey(levelId) || stars > levelStars[levelId]!) levelStars[levelId] = stars;
   }
 
   static Level getLevel(int id) {

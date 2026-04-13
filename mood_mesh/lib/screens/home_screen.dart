@@ -9,6 +9,7 @@ import '../widgets/game_button.dart';
 import '../core/game_settings.dart';
 import '../core/storage_manager.dart';
 import '../core/ad_manager.dart';
+import '../core/audio_manager.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/game_logo.dart';
 
@@ -26,18 +27,30 @@ class _HomeScreenState extends State<HomeScreen> {
     if (GameSettings.lastDailyPuzzleDate == today) {
       showDialog(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (context) => Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('🌟 All Done!', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.primary, fontSize: 26)),
-          content: const Text(
-            'You have already conquered today\'s daily puzzle.\n\nCome back tomorrow for a brand new challenge!', 
-            textAlign: TextAlign.center, 
-            style: TextStyle(fontSize: 18, color: AppTheme.textDark, fontWeight: FontWeight.w600)
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 20, offset: Offset(0, 10))],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.star_rounded, color: AppTheme.primary, size: 80),
+                const SizedBox(height: 10),
+                const Text('All Done!', style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.primary, fontSize: 32)),
+                const SizedBox(height: 15),
+                const Text('You have already conquered today\'s daily puzzle.\n\nCome back tomorrow for a brand new challenge!', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, color: AppTheme.textDark, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 30),
+                GameButton(title: 'GOT IT', color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, isSmall: true, onTap: () => Navigator.pop(context))
+              ],
+            ),
           ),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: [
-            GameButton(title: 'GOT IT', color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, isSmall: true, onTap: () => Navigator.pop(context))
-          ],
         )
       );
     } else {
@@ -50,13 +63,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ad is still loading. Please try again in a moment!')));
       return;
     }
-    
     AdManager.instance.showRewardedAd(() {
-      setState(() {
-        GameSettings.totalCoins += 50;
-      });
+      setState(() => GameSettings.totalCoins += 10);
       StorageManager.saveEconomy();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reward Earned: +50 Coins!', style: TextStyle(fontWeight: FontWeight.bold))));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reward Earned: +10 Coins!', style: TextStyle(fontWeight: FontWeight.bold))));
     });
   }
 
@@ -83,8 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: AppTheme.white,
-                          borderRadius: BorderRadius.circular(20),
+                          color: AppTheme.white, borderRadius: BorderRadius.circular(20),
                           boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
                           border: Border.all(color: const Color(0xFFE5E9F0), width: 2),
                         ),
@@ -114,33 +123,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 50),
                       
                       GameButton(
-                        title: 'PLAY LEVEL $currentLevel',
-                        icon: Icons.play_arrow_rounded,
-                        color: AppTheme.primary,
-                        shadowColor: AppTheme.primaryDark,
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelSelectScreen())).then((_) => setState(() {})); 
-                        },
+                        title: 'PLAY LEVEL $currentLevel', icon: Icons.play_arrow_rounded, color: AppTheme.primary, shadowColor: AppTheme.primaryDark,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelSelectScreen())).then((_) => setState(() {})),
                       ),
                       const SizedBox(height: 15),
-                      
-                      GameButton(
-                        title: 'DAILY PUZZLE',
-                        icon: Icons.calendar_month_rounded,
-                        color: AppTheme.accent,
-                        shadowColor: AppTheme.accentDark,
-                        onTap: _playDailyPuzzle,
-                      ),
+                      GameButton(title: 'DAILY PUZZLE', icon: Icons.calendar_month_rounded, color: AppTheme.accent, shadowColor: AppTheme.accentDark, onTap: _playDailyPuzzle),
                       const SizedBox(height: 15),
-                      
-                      GameButton(
-                        title: 'WATCH AD (+50🪙)',
-                        icon: Icons.ondemand_video_rounded,
-                        color: AppTheme.success,
-                        shadowColor: AppTheme.successDark,
-                        isSmall: true,
-                        onTap: _watchAdForCoins,
-                      ),
+                      GameButton(title: 'WATCH AD (+10🪙)', icon: Icons.ondemand_video_rounded, color: AppTheme.success, shadowColor: AppTheme.successDark, isSmall: true, onTap: _watchAdForCoins),
                     ],
                   ),
                 ),
@@ -154,15 +143,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildIconButton(IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        AudioManager.playClick();
+        onTap();
+      },
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
-          border: Border.all(color: const Color(0xFFE5E9F0), width: 2),
-        ),
+        decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))], border: Border.all(color: const Color(0xFFE5E9F0), width: 2)),
         child: Icon(icon, color: color, size: 28),
       ),
     );

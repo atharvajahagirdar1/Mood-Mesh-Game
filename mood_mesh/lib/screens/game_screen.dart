@@ -5,6 +5,7 @@ import '../core/app_theme.dart';
 import '../core/game_settings.dart';
 import '../core/storage_manager.dart';
 import '../core/audio_manager.dart';
+import '../core/ad_manager.dart';
 import '../widgets/dot_widget.dart';
 import '../widgets/path_painter.dart';
 import '../widgets/game_button.dart';
@@ -65,32 +66,22 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     }
     
     if (bestPath.length > 1) {
-      AudioManager.playPop(); // Reusing pop for generic good notification
-      setState(() {
-        hintedPath = List.from(bestPath);
-        isHintActive = true;
-      });
-      StorageManager.saveEconomy(); // Save updated hints/coins
+      AudioManager.playClick();
+      setState(() { hintedPath = List.from(bestPath); isHintActive = true; });
+      StorageManager.saveEconomy(); 
     }
   }
 
   void _dfsFindPath(int current, List<int> currentPath, List<int> bestPath) {
-    if (currentPath.length > bestPath.length) {
-      bestPath.clear();
-      bestPath.addAll(currentPath);
-    }
-    int r = current ~/ widget.level.cols;
-    int c = current % widget.level.cols;
+    if (currentPath.length > bestPath.length) { bestPath.clear(); bestPath.addAll(currentPath); }
+    int r = current ~/ widget.level.cols; int c = current % widget.level.cols;
     List<List<int>> dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-    
     for (var d in dirs) {
       int nr = r + d[0], nc = c + d[1];
       if (nr >= 0 && nr < widget.level.rows && nc >= 0 && nc < widget.level.cols) {
         int nIdx = nr * widget.level.cols + nc;
         if (grid[nIdx] == Mood.happy && !currentPath.contains(nIdx)) {
-          currentPath.add(nIdx);
-          _dfsFindPath(nIdx, currentPath, bestPath);
-          currentPath.removeLast();
+          currentPath.add(nIdx); _dfsFindPath(nIdx, currentPath, bestPath); currentPath.removeLast();
         }
       }
     }
@@ -98,43 +89,26 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
 
   void _useHint() {
     if (movesLeft <= 0 || isProcessing || isHintActive) return;
-
     if (GameSettings.availableHints > 0) {
-      setState(() => GameSettings.availableHints--);
-      _executeHint();
+      setState(() => GameSettings.availableHints--); _executeHint();
     } else if (GameSettings.totalCoins >= GameSettings.hintCost) {
-      setState(() => GameSettings.totalCoins -= GameSettings.hintCost);
-      _executeHint();
+      setState(() => GameSettings.totalCoins -= GameSettings.hintCost); _executeHint();
     } else {
       if (GameSettings.hapticsOn) HapticFeedback.heavyImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Not enough coins for a hint!', style: TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: AppTheme.accent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        )
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Not enough coins for a hint!', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: AppTheme.accent, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))));
     }
   }
 
   void _triggerRipple() async {
-    if (path.length <= 1) {
-      setState(() => path.clear());
-      return;
-    }
+    if (path.length <= 1) { setState(() => path.clear()); return; }
 
     if (GameSettings.hapticsOn) HapticFeedback.mediumImpact();
     setState(() => isProcessing = true);
     
-    Set<int> pathSet = path.toSet();
-    Set<int> neighborsToChange = {};
-
+    Set<int> pathSet = path.toSet(); Set<int> neighborsToChange = {};
     for (int idx in path) {
-      int r = idx ~/ widget.level.cols;
-      int c = idx % widget.level.cols;
+      int r = idx ~/ widget.level.cols; int c = idx % widget.level.cols;
       List<List<int>> potentialNeighbors = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]];
-
       for (var n in potentialNeighbors) {
         int nr = n[0], nc = n[1];
         if (nr >= 0 && nr < widget.level.rows && nc >= 0 && nc < widget.level.cols) {
@@ -145,51 +119,35 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     }
 
     await Future.delayed(const Duration(milliseconds: 150));
-
     setState(() {
       for (int nIdx in neighborsToChange) {
         if (grid[nIdx] == Mood.happy) grid[nIdx] = Mood.angry;
         else if (grid[nIdx] == Mood.angry) grid[nIdx] = Mood.sleepy;
         else grid[nIdx] = Mood.happy;
       }
-      movesLeft--;
-      path.clear();
-      isProcessing = false;
-      _checkWinLoss();
+      movesLeft--; path.clear(); isProcessing = false; _checkWinLoss();
     });
   }
 
   void _checkWinLoss() {
     bool isWin = grid.every((mood) => mood == Mood.happy);
     if (isWin) {
-      AudioManager.playWin();
-      if (GameSettings.hapticsOn) HapticFeedback.vibrate();
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LevelCompleteScreen(level: widget.level, movesLeft: movesLeft, isDaily: widget.isDaily)));
     } else if (movesLeft <= 0) {
-      // Could add playLose() here if asset added
       if (GameSettings.hapticsOn) HapticFeedback.heavyImpact();
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameOverScreen(level: widget.level, isDaily: widget.isDaily)));
     }
   }
 
   void _handlePanStart(Offset localPosition, Size boardSize) {
-    if (isHintActive) {
-      setState(() {
-        isHintActive = false;
-        hintedPath.clear();
-      });
-    }
+    if (isHintActive) { setState(() { isHintActive = false; hintedPath.clear(); }); }
     _handlePanUpdate(localPosition, boardSize);
   }
 
   void _handlePanUpdate(Offset localPosition, Size boardSize) {
     if (isProcessing) return;
-
-    double cellWidth = boardSize.width / widget.level.cols;
-    double cellHeight = boardSize.height / widget.level.rows;
-    int c = (localPosition.dx / cellWidth).floor();
-    int r = (localPosition.dy / cellHeight).floor();
-
+    double cellWidth = boardSize.width / widget.level.cols; double cellHeight = boardSize.height / widget.level.rows;
+    int c = (localPosition.dx / cellWidth).floor(); int r = (localPosition.dy / cellHeight).floor();
     if (c < 0 || c >= widget.level.cols || r < 0 || r >= widget.level.rows) return;
     int idx = r * widget.level.cols + c;
 
@@ -197,7 +155,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       if (grid[idx] == Mood.happy) {
         setState(() => path.add(idx));
         if (GameSettings.hapticsOn) HapticFeedback.selectionClick();
-        AudioManager.playPop();
+        AudioManager.playPop(); 
       }
       return;
     }
@@ -209,15 +167,13 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     }
 
     if (!path.contains(idx)) {
-      int lastIdx = path.last;
-      int lastR = lastIdx ~/ widget.level.cols;
-      int lastC = lastIdx % widget.level.cols;
+      int lastIdx = path.last; int lastR = lastIdx ~/ widget.level.cols; int lastC = lastIdx % widget.level.cols;
       bool isAdjacent = (r - lastR).abs() + (c - lastC).abs() == 1;
 
       if (isAdjacent && grid[idx] == Mood.happy) {
         setState(() => path.add(idx));
         if (GameSettings.hapticsOn) HapticFeedback.selectionClick();
-        AudioManager.playPop();
+        AudioManager.playPop(); 
       }
     }
   }
@@ -228,6 +184,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     bool hasFreeHints = GameSettings.availableHints > 0;
 
     return Scaffold(
+      bottomNavigationBar: const BannerAdWidget(), 
       body: Stack(
         children: [
           const AnimatedBackground(),
@@ -274,41 +231,16 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                                 padding: const EdgeInsets.all(10),
                                 child: Stack(
                                   children: [
-                                    // 1. Neon Pulsing Hint Path (Underneath)
                                     if (isHintActive && hintedPath.isNotEmpty)
                                       AnimatedBuilder(
                                         animation: _hintPulseController,
                                         builder: (context, child) {
-                                          return CustomPaint(
-                                            size: constraints.biggest,
-                                            painter: PathPainter(
-                                              path: hintedPath, 
-                                              cols: widget.level.cols, 
-                                              rows: widget.level.rows,
-                                              pathColor: AppTheme.neonBlue, 
-                                              strokeWidth: 20.0, 
-                                              isNeon: true,
-                                              pulseValue: _hintPulseController.value
-                                            ),
-                                          );
+                                          return CustomPaint(size: constraints.biggest, painter: PathPainter(path: hintedPath, cols: widget.level.cols, rows: widget.level.rows, pathColor: AppTheme.neonBlue, strokeWidth: 20.0, isNeon: true, pulseValue: _hintPulseController.value));
                                         }
                                       ),
-                                    
-                                    // 2. Solid Player Draw Path
                                     if (path.isNotEmpty)
-                                      CustomPaint(
-                                        size: constraints.biggest,
-                                        painter: PathPainter(
-                                          path: path, 
-                                          cols: widget.level.cols, 
-                                          rows: widget.level.rows,
-                                          pathColor: Colors.white, 
-                                          strokeWidth: 18.0,
-                                          isNeon: false,
-                                        ),
-                                      ),
+                                      CustomPaint(size: constraints.biggest, painter: PathPainter(path: path, cols: widget.level.cols, rows: widget.level.rows, pathColor: Colors.white, strokeWidth: 18.0, isNeon: false)),
 
-                                    // 3. The Grid
                                     GridView.builder(
                                       physics: const NeverScrollableScrollPhysics(),
                                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: widget.level.cols),
@@ -316,13 +248,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                                       itemBuilder: (context, index) {
                                         return Padding(
                                           padding: const EdgeInsets.all(8.0),
-                                          child: DotWidget(
-                                            key: ValueKey(index),
-                                            mood: grid[index],
-                                            isInPath: path.contains(index),
-                                            isLast: path.isNotEmpty && path.last == index,
-                                            isHighlighted: false, 
-                                          ),
+                                          child: DotWidget(mood: grid[index], isInPath: path.contains(index), isLast: path.isNotEmpty && path.last == index, isHighlighted: false),
                                         );
                                       },
                                     ),
@@ -338,14 +264,8 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                   const SizedBox(height: 20),
                   
                   GameButton(
-                    title: hasFreeHints 
-                        ? 'USE HINT (${GameSettings.availableHints})' 
-                        : 'BUY HINT (${GameSettings.hintCost}🪙)',
-                    icon: Icons.lightbulb_rounded,
-                    color: hasFreeHints ? AppTheme.primary : AppTheme.coinGold,
-                    shadowColor: hasFreeHints ? AppTheme.primaryDark : AppTheme.coinDark,
-                    isSmall: true,
-                    onTap: _useHint,
+                    title: hasFreeHints ? 'USE HINT (${GameSettings.availableHints})' : 'BUY HINT (${GameSettings.hintCost}🪙)',
+                    icon: Icons.lightbulb_rounded, color: hasFreeHints ? AppTheme.primary : AppTheme.coinGold, shadowColor: hasFreeHints ? AppTheme.primaryDark : AppTheme.coinDark, isSmall: true, onTap: _useHint,
                   ),
                   const SizedBox(height: 20),
                 ],

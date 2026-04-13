@@ -1,6 +1,8 @@
 import os
 import sys
 import subprocess
+import re
+import base64
 
 def add_flutter_dependencies():
     print("\n📦 Installing required Flutter packages...")
@@ -8,7 +10,8 @@ def add_flutter_dependencies():
         "shared_preferences", 
         "audioplayers", 
         "google_mobile_ads", 
-        "confetti"
+        "confetti",
+        "google_fonts"
     ]
     use_shell = os.name == 'nt'
     for pkg in packages:
@@ -18,6 +21,21 @@ def add_flutter_dependencies():
     print("   Adding flutter_launcher_icons...")
     subprocess.run(["flutter", "pub", "add", "dev:flutter_launcher_icons"], check=True, shell=use_shell)
 
+def create_placeholder_audio():
+    print("\n🎵 Auto-generating placeholder audio files to prevent crashes...")
+    os.makedirs(os.path.join("assets", "audio"), exist_ok=True)
+    # A tiny, perfectly valid 1-second silent MP3 encoded in base64
+    silent_mp3_b64 = "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIwB3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3//MUZAAAAAGkAAAAAAAAAABQAAA//MUZAMAAAGkAAAAAAAAAABQAAA//MUZAYAAAGkAAAAAAAAAABQAAA//MUZAcAAAGkAAAAAAAAAABQAAA="
+    audio_data = base64.b64decode(silent_mp3_b64)
+    
+    files = ['bgm.mp3', 'pop.mp3', 'click.mp3', 'win.mp3']
+    for file in files:
+        path = os.path.join("assets", "audio", file)
+        if not os.path.exists(path):
+            with open(path, "wb") as f:
+                f.write(audio_data)
+            print(f"   ✅ Created placeholder {path}")
+
 def configure_pubspec():
     print("\n📄 Configuring pubspec.yaml for assets and icons...")
     if not os.path.exists("pubspec.yaml"): return
@@ -25,16 +43,20 @@ def configure_pubspec():
     with open("pubspec.yaml", "r", encoding="utf-8") as f:
         content = f.read()
         
-    # Auto-inject assets folder
     if "assets/audio/" not in content:
         if "\n  assets:\n" in content:
             content = content.replace("\n  assets:\n", "\n  assets:\n    - assets/\n    - assets/audio/\n")
         elif "\nflutter:\n" in content:
             content = content.replace("\nflutter:\n", "\nflutter:\n  assets:\n    - assets/\n    - assets/audio/\n")
             
-    # Auto-inject icon configuration
     if "flutter_icons:" not in content:
-        content += "\n\nflutter_icons:\n  android: true\n  ios: true\n  image_path: \"assets/mood_mash_icon.png\"\n"
+        content += """\n
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/mood_mash_icon.png"
+  remove_alpha_ios: true
+"""
         
     with open("pubspec.yaml", "w", encoding="utf-8") as f:
         f.write(content)
@@ -42,90 +64,76 @@ def configure_pubspec():
 
 def inject_admob_ids():
     print("\n⚙️ Injecting AdMob Test App IDs into Manifests...")
-    
-    # 1. Android Manifest
     android_manifest = os.path.join("android", "app", "src", "main", "AndroidManifest.xml")
     if os.path.exists(android_manifest):
         with open(android_manifest, "r", encoding='utf-8') as f:
             content = f.read()
-        
         if "com.google.android.gms.ads.APPLICATION_ID" not in content:
             admob_meta = '\n        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>\n        <activity'
             content = content.replace("<activity", admob_meta, 1) 
-            
             with open(android_manifest, "w", encoding='utf-8') as f:
                 f.write(content)
-            print("   ✅ Android AdMob ID injected.")
     
-    # 2. iOS Info.plist
     ios_plist = os.path.join("ios", "Runner", "Info.plist")
     if os.path.exists(ios_plist):
         with open(ios_plist, "r", encoding='utf-8') as f:
             content = f.read()
-            
         if "GADApplicationIdentifier" not in content:
             admob_key = '<dict>\n\t<key>GADApplicationIdentifier</key>\n\t<string>ca-app-pub-3940256099942544~1458002511</string>'
             content = content.replace("<dict>", admob_key, 1)
-            
             with open(ios_plist, "w", encoding='utf-8') as f:
                 f.write(content)
-            print("   ✅ iOS AdMob ID injected.")
 
 def configure_android_build():
-    print("\n🔧 Fixing Android Build Settings (minSdkVersion & ndkVersion)...")
+    print("\n🔧 Aggressively Fixing Android Build Settings (minSdkVersion & ndkVersion)...")
     
-    # Handle modern Flutter projects (Kotlin DSL)
+    # 1. Fix local.properties which overrides minSdk in newer Flutter versions
+    local_prop_path = os.path.join("android", "local.properties")
+    if os.path.exists(local_prop_path):
+        with open(local_prop_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        if re.search(r'flutter\.minSdkVersion\s*=\s*\d+', content):
+            content = re.sub(r'flutter\.minSdkVersion\s*=\s*\d+', 'flutter.minSdkVersion=23', content)
+        else:
+            content += '\nflutter.minSdkVersion=23\n'
+        with open(local_prop_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        print("   ✅ android/local.properties patched (flutter.minSdkVersion=23).")
+
+    # 2. Fix build.gradle.kts for NDK
     kts_path = os.path.join("android", "app", "build.gradle.kts")
-    # Handle older Flutter projects (Groovy)
-    groovy_path = os.path.join("android", "app", "build.gradle")
-    
     if os.path.exists(kts_path):
         with open(kts_path, "r", encoding="utf-8") as f:
             content = f.read()
-        modified = False
+            
+        content = re.sub(r'minSdk\s*=\s*21', 'minSdk = 23', content)
         
-        if "minSdk = flutter.minSdkVersion" in content:
-            content = content.replace("minSdk = flutter.minSdkVersion", "minSdk = 23")
-            modified = True
-        elif "minSdk = 21" in content:
-            content = content.replace("minSdk = 21", "minSdk = 23")
-            modified = True
+        if "ndkVersion" in content:
+            content = re.sub(r'ndkVersion\s*=\s*"[^"]+"', 'ndkVersion = "27.0.12077973"', content)
+        else:
+            content = content.replace("android {", "android {\n    ndkVersion = \"27.0.12077973\"")
             
-        if "ndkVersion" not in content and "android {" in content:
-            content = content.replace("android {", "android {\n    ndkVersion = \"27.0.12077973\"", 1)
-            modified = True
-            
-        if modified:
-            with open(kts_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            print("   ✅ Android build.gradle.kts patched (minSdk=23, ndk=27.0.12077973).")
-            
-    elif os.path.exists(groovy_path):
+        with open(kts_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        print("   ✅ build.gradle.kts patched (ndk=27.0.12077973).")
+
+    # 3. Fix build.gradle for NDK (Older Flutter versions)
+    groovy_path = os.path.join("android", "app", "build.gradle")
+    if os.path.exists(groovy_path):
         with open(groovy_path, "r", encoding="utf-8") as f:
             content = f.read()
-        modified = False
+            
+        content = re.sub(r'minSdkVersion\s+21', 'minSdkVersion 23', content)
         
-        if "minSdkVersion flutter.minSdkVersion" in content:
-            content = content.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 23")
-            modified = True
-        elif "minSdkVersion 21" in content:
-            content = content.replace("minSdkVersion 21", "minSdkVersion 23")
-            modified = True
+        if "ndkVersion" in content:
+            content = re.sub(r'ndkVersion\s*"[^"]+"', 'ndkVersion "27.0.12077973"', content)
+        else:
+            content = content.replace("android {", "android {\n    ndkVersion \"27.0.12077973\"")
             
-        if "ndkVersion" not in content and "android {" in content:
-            content = content.replace("android {", "android {\n    ndkVersion = \"27.0.12077973\"", 1)
-            modified = True
-            
-        if modified:
-            with open(groovy_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            print("   ✅ Android build.gradle patched (minSdkVersion=23, ndk=27.0.12077973).")
-    else:
-        print("   ⚠️ Could not find Android build.gradle files to patch.")
+        with open(groovy_path, "w", encoding="utf-8") as f:
+            f.write(content)
 
 def get_dart_files():
-    """Returns a dictionary containing all production-level Dart files and their paths."""
-    
     return {
         "lib/main.dart": r"""
 import 'package:flutter/material.dart';
@@ -140,11 +148,12 @@ import 'screens/splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Core Services
   await StorageManager.init();
   await MobileAds.instance.initialize();
-  AudioManager.init();
+  await AudioManager.init();
+  
   AdManager.instance.loadRewardedAd();
+  AdManager.instance.loadInterstitialAd();
   
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((_) {
     runApp(const MoodMeshApp());
@@ -218,44 +227,54 @@ import 'package:audioplayers/audioplayers.dart';
 import 'game_settings.dart';
 
 class AudioManager {
-  static final AudioPlayer _sfxPlayer = AudioPlayer();
   static final AudioPlayer _bgmPlayer = AudioPlayer();
+  static final AudioPlayer _clickPlayer = AudioPlayer();
+  static final AudioPlayer _winPlayer = AudioPlayer();
+  
+  // Overlapping audio pool for dot connections (Removed deprecated lowLatency mode)
+  static final List<AudioPlayer> _popPlayers = List.generate(4, (_) => AudioPlayer());
+  static int _popIndex = 0;
 
-  static void init() {
+  static Future<void> init() async {
     _bgmPlayer.setReleaseMode(ReleaseMode.loop);
   }
 
   static Future<void> playBgm() async {
     if (!GameSettings.musicOn) return;
     try {
-      await _bgmPlayer.play(AssetSource('audio/bgm.mp3'), volume: 0.5);
-    } catch (e) {
-      // Safe catch: App won't crash if bgm.mp3 is missing
-    }
+      await _bgmPlayer.play(AssetSource('audio/bgm.mp3'), volume: 0.15);
+    } catch (e) {}
   }
 
   static Future<void> stopBgm() async {
-    try {
-      await _bgmPlayer.stop();
-    } catch (e) {}
+    try { await _bgmPlayer.stop(); } catch (e) {}
   }
 
   static Future<void> playPop() async {
     if (!GameSettings.soundOn) return;
     try {
-      await _sfxPlayer.play(AssetSource('audio/pop.mp3'), mode: PlayerMode.lowLatency);
+      await _popPlayers[_popIndex].play(AssetSource('audio/pop.mp3'));
+      _popIndex = (_popIndex + 1) % _popPlayers.length;
+    } catch (e) {}
+  }
+
+  static Future<void> playClick() async {
+    if (!GameSettings.soundOn) return;
+    try {
+      await _clickPlayer.play(AssetSource('audio/click.mp3'));
     } catch (e) {}
   }
 
   static Future<void> playWin() async {
     if (!GameSettings.soundOn) return;
     try {
-      await _sfxPlayer.play(AssetSource('audio/win.mp3'));
+      await _winPlayer.play(AssetSource('audio/win.mp3'));
     } catch (e) {}
   }
 }
 """,
         "lib/core/ad_manager.dart": r"""
+import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'dart:io' show Platform;
 
@@ -265,101 +284,163 @@ class AdManager {
 
   RewardedAd? _rewardedAd;
   bool isAdLoaded = false;
+  
+  InterstitialAd? _interstitialAd;
+  bool isInterstitialLoaded = false;
 
-  // Test Ad Unit IDs provided by Google
   final String _androidRewardedId = 'ca-app-pub-3940256099942544/5224354917';
   final String _iosRewardedId = 'ca-app-pub-3940256099942544/1712485313';
+  
+  final String _androidInterstitialId = 'ca-app-pub-3940256099942544/1033173712';
+  final String _iosInterstitialId = 'ca-app-pub-3940256099942544/4411468910';
 
   void loadRewardedAd() {
-    String adUnitId = Platform.isAndroid ? _androidRewardedId : _iosRewardedId;
-
     RewardedAd.load(
-      adUnitId: adUnitId,
+      adUnitId: Platform.isAndroid ? _androidRewardedId : _iosRewardedId,
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) {
-          _rewardedAd = ad;
-          isAdLoaded = true;
-        },
-        onAdFailedToLoad: (error) {
-          isAdLoaded = false;
-          _rewardedAd = null;
-        },
+        onAdLoaded: (ad) { _rewardedAd = ad; isAdLoaded = true; },
+        onAdFailedToLoad: (error) { isAdLoaded = false; _rewardedAd = null; },
       ),
     );
   }
 
   void showRewardedAd(Function onRewardEarned) {
     if (_rewardedAd != null && isAdLoaded) {
-      _rewardedAd!.show(
-        onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
-          onRewardEarned();
-        },
-      );
-      
+      _rewardedAd!.show(onUserEarnedReward: (AdWithoutView ad, RewardItem reward) => onRewardEarned());
       _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
-        onAdDismissedFullScreenContent: (ad) {
-          ad.dispose();
-          loadRewardedAd(); // Load the next ad immediately
-        },
-        onAdFailedToShowFullScreenContent: (ad, error) {
-          ad.dispose();
-          loadRewardedAd();
-        },
+        onAdDismissedFullScreenContent: (ad) { ad.dispose(); loadRewardedAd(); },
+        onAdFailedToShowFullScreenContent: (ad, error) { ad.dispose(); loadRewardedAd(); },
       );
     } else {
       loadRewardedAd();
     }
   }
+
+  void loadInterstitialAd() {
+    InterstitialAd.load(
+      adUnitId: Platform.isAndroid ? _androidInterstitialId : _iosInterstitialId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) { _interstitialAd = ad; isInterstitialLoaded = true; },
+        onAdFailedToLoad: (error) { _interstitialAd = null; isInterstitialLoaded = false; }
+      )
+    );
+  }
+
+  void showInterstitialIfReady() {
+    if (_interstitialAd != null && isInterstitialLoaded) {
+      _interstitialAd!.show();
+      _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+        onAdDismissedFullScreenContent: (ad) { ad.dispose(); loadInterstitialAd(); },
+        onAdFailedToShowFullScreenContent: (ad, err) { ad.dispose(); loadInterstitialAd(); }
+      );
+    } else {
+      loadInterstitialAd();
+    }
+  }
+}
+
+class BannerAdWidget extends StatefulWidget {
+  const BannerAdWidget({Key? key}) : super(key: key);
+  @override
+  State<BannerAdWidget> createState() => _BannerAdWidgetState();
+}
+
+class _BannerAdWidgetState extends State<BannerAdWidget> {
+  BannerAd? _bannerAd;
+  bool _isLoaded = false;
+
+  final String _androidBannerId = 'ca-app-pub-3940256099942544/6300978111';
+  final String _iosBannerId = 'ca-app-pub-3940256099942544/2934735716';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAd();
+  }
+
+  void _loadAd() {
+    _bannerAd = BannerAd(
+      adUnitId: Platform.isAndroid ? _androidBannerId : _iosBannerId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (_) {
+          if (mounted) setState(() => _isLoaded = true);
+        },
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+        },
+      ),
+    )..load();
+  }
+
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoaded && _bannerAd != null) {
+      return Container(
+        color: Colors.transparent,
+        width: _bannerAd!.size.width.toDouble(),
+        height: _bannerAd!.size.height.toDouble(),
+        child: AdWidget(ad: _bannerAd!),
+      );
+    }
+    return const SizedBox.shrink();
+  }
 }
 """,
         "lib/core/app_theme.dart": r"""
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // Minimalist, Clean Background Colors
-  static const Color backgroundLight = Color(0xFFFFFFFF); // Pure White
-  static const Color backgroundDark = Color(0xFFF0F4F8);  // Very subtle cool grey
+  static const Color backgroundLight = Color(0xFFFFFFFF); 
+  static const Color backgroundDark = Color(0xFFF0F4F8);  
   
-  // 3D Button Colors - High Contrast
-  static const Color primary = Color(0xFFFFB703); // Warm Gold
+  static const Color primary = Color(0xFFFFB703); 
   static const Color primaryDark = Color(0xFFE89D00); 
   
-  static const Color secondary = Color(0xFF4EA8DE); // Bright Cyan
+  static const Color secondary = Color(0xFF4EA8DE); 
   static const Color secondaryDark = Color(0xFF0077B6);
   
-  static const Color accent = Color(0xFFFF595E); // Punchy Red
+  static const Color accent = Color(0xFFFF595E); 
   static const Color accentDark = Color(0xFFD62828);
 
-  static const Color success = Color(0xFF06D6A0); // Vivid Green
+  static const Color success = Color(0xFF06D6A0); 
   static const Color successDark = Color(0xFF05B083);
   
   static const Color coinGold = Color(0xFFFFC107);
   static const Color coinDark = Color(0xFFF77F00);
 
-  // Hint Glow Colors
   static const Color neonBlue = Color(0xFF00E5FF);
   
-  static const Color textDark = Color(0xFF1D2D44); // Deep Navy Blue for extreme readability
+  static const Color textDark = Color(0xFF1D2D44); 
   static const Color textLight = Color(0xFF748A9D);
   static const Color white = Colors.white;
 
-  // Vibrant Mood Colors (For the Dots)
-  static const Color moodHappy = Color(0xFFFFEA00); // Lemon Yellow
-  static const Color moodAngry = Color(0xFFFF3D00); // Neon Red
-  static const Color moodSleepy = Color(0xFF00E5FF); // Cyan Blue
+  // New High-Contrast Requested Colors
+  static const Color moodHappy = Color(0xFFFFEA00); 
+  static const Color moodAngry = Color(0xFFFF3D00); 
+  static const Color moodSleepy = Color(0xFF00E5FF); 
 
   static ThemeData get lightTheme {
     return ThemeData(
       scaffoldBackgroundColor: backgroundLight,
       primaryColor: primary,
-      fontFamily: 'Nunito', 
-      appBarTheme: const AppBarTheme(
+      textTheme: GoogleFonts.nunitoTextTheme(),
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: textDark),
+        iconTheme: const IconThemeData(color: textDark),
         centerTitle: true,
-        titleTextStyle: TextStyle(color: textDark, fontSize: 24, fontWeight: FontWeight.w900),
+        titleTextStyle: GoogleFonts.nunito(color: textDark, fontSize: 24, fontWeight: FontWeight.w900),
       ),
     );
   }
@@ -367,14 +448,11 @@ class AppTheme {
   static BoxDecoration gameBoxDecoration = BoxDecoration(
     color: white,
     borderRadius: BorderRadius.circular(24),
-    boxShadow: const [
-      BoxShadow(color: Color(0x0F000000), blurRadius: 20, offset: Offset(0, 8)), // Softer, modern shadow
-    ],
-    border: Border.all(color: const Color(0xFFE5E9F0), width: 2), // Clean outline
+    boxShadow: const [BoxShadow(color: Color(0x0F000000), blurRadius: 20, offset: Offset(0, 8))],
+    border: Border.all(color: const Color(0xFFE5E9F0), width: 2),
   );
 }
 """,
-
         "lib/core/game_settings.dart": r"""
 class GameSettings {
   static String currentTheme = 'classic'; 
@@ -382,7 +460,6 @@ class GameSettings {
   static bool musicOn = true;
   static bool hapticsOn = true;
   
-  // Economy & Progression
   static int totalCoins = 0;
   static int availableHints = 5; 
   static const int hintCost = 20;
@@ -395,7 +472,6 @@ class GameSettings {
   }
 }
 """,
-
         "lib/models/level.dart": r"""
 enum Mood { happy, angry, sleepy }
 
@@ -419,7 +495,6 @@ class Level {
   });
 }
 """,
-
         "lib/core/level_data.dart": r"""
 import 'dart:math';
 import '../models/level.dart';
@@ -434,9 +509,7 @@ class LevelData {
     Random rand = Random(levelSeed + 1000); 
 
     int cols = 3, rows = 3;
-    if (forceDaily) {
-      cols = 5; rows = 5;
-    } else {
+    if (forceDaily) { cols = 5; rows = 5; } else {
       if (levelSeed > 10) { cols = 4; rows = 4; }
       if (levelSeed > 50) { cols = 5; rows = 5; }
       if (levelSeed > 120) { cols = 6; rows = 6; }
@@ -475,9 +548,7 @@ class LevelData {
         if (c < cols - 1) neighbors.add(startDot + 1);
 
         List<int> happyNeighbors = neighbors.where((n) => grid[n] == 0).toList();
-        if (happyNeighbors.isNotEmpty) {
-          path.add(happyNeighbors[rand.nextInt(happyNeighbors.length)]);
-        }
+        if (happyNeighbors.isNotEmpty) { path.add(happyNeighbors[rand.nextInt(happyNeighbors.length)]); }
       }
 
       Set<int> pathSet = path.toSet();
@@ -496,29 +567,15 @@ class LevelData {
         }
       }
 
-      for (int nIdx in neighborsToChange) {
-        grid[nIdx] = (grid[nIdx] + 2) % 3;
-      }
+      for (int nIdx in neighborsToChange) { grid[nIdx] = (grid[nIdx] + 2) % 3; }
     }
 
-    int maxMoves = forceDaily 
-        ? requiredMoves + 6 
-        : requiredMoves + 4 + (levelSeed ~/ 15); 
-    
-    if (levelSeed == 1 && !forceDaily) {
-      grid = [2, 2, 2, 0, 0, 0, 2, 2, 2];
-      requiredMoves = 1;
-      maxMoves = 5;
-    }
+    int maxMoves = forceDaily ? requiredMoves + 6 : requiredMoves + 4 + (levelSeed ~/ 15); 
+    if (levelSeed == 1 && !forceDaily) { grid = [2, 2, 2, 0, 0, 0, 2, 2, 2]; requiredMoves = 1; maxMoves = 5; }
 
     return Level(
-      id: overrideId ?? levelSeed,
-      cols: cols,
-      rows: rows,
-      maxMoves: maxMoves,
-      movesFor3Stars: requiredMoves,
-      movesFor2Stars: requiredMoves + (maxMoves - requiredMoves) ~/ 2,
-      initialGrid: grid,
+      id: overrideId ?? levelSeed, cols: cols, rows: rows, maxMoves: maxMoves,
+      movesFor3Stars: requiredMoves, movesFor2Stars: requiredMoves + (maxMoves - requiredMoves) ~/ 2, initialGrid: grid,
     );
   }
 
@@ -529,15 +586,11 @@ class LevelData {
   }
 
   static void unlockNextLevel(int currentLevelId) {
-    if (currentLevelId == maxUnlockedLevel && currentLevelId < allLevels.length) {
-      maxUnlockedLevel++;
-    }
+    if (currentLevelId == maxUnlockedLevel && currentLevelId < allLevels.length) maxUnlockedLevel++;
   }
 
   static void saveStars(int levelId, int stars) {
-    if (!levelStars.containsKey(levelId) || stars > levelStars[levelId]!) {
-      levelStars[levelId] = stars;
-    }
+    if (!levelStars.containsKey(levelId) || stars > levelStars[levelId]!) levelStars[levelId] = stars;
   }
 
   static Level getLevel(int id) {
@@ -546,7 +599,6 @@ class LevelData {
   }
 }
 """,
-
         "lib/widgets/game_logo.dart": r"""
 import 'package:flutter/material.dart';
 import '../models/level.dart';
@@ -560,8 +612,7 @@ class GameLogoWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: size,
-      height: size * 0.65,
+      width: size, height: size * 0.65,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -570,35 +621,25 @@ class GameLogoWidget extends StatelessWidget {
             child: Container(
               width: size * 0.6, height: size * 0.15,
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                color: Colors.white, borderRadius: BorderRadius.circular(20),
                 boxShadow: const [BoxShadow(color: AppTheme.neonBlue, blurRadius: 15, spreadRadius: 2)],
               ),
             ),
           ),
-          Positioned(
-            left: 0, bottom: 0,
-            child: SizedBox(width: size*0.42, height: size*0.42, child: const DotWidget(mood: Mood.happy, isInPath: false, isLast: false)),
-          ),
-          Positioned(
-            left: size * 0.29, top: 0,
-            child: SizedBox(width: size*0.42, height: size*0.42, child: const DotWidget(mood: Mood.angry, isInPath: false, isLast: false)),
-          ),
-          Positioned(
-            right: 0, bottom: size * 0.05,
-            child: SizedBox(width: size*0.42, height: size*0.42, child: const DotWidget(mood: Mood.sleepy, isInPath: false, isLast: false)),
-          ),
+          Positioned(left: 0, bottom: 0, child: SizedBox(width: size*0.42, height: size*0.42, child: const DotWidget(mood: Mood.happy, isInPath: false, isLast: false))),
+          Positioned(left: size * 0.29, top: 0, child: SizedBox(width: size*0.42, height: size*0.42, child: const DotWidget(mood: Mood.angry, isInPath: false, isLast: false))),
+          Positioned(right: 0, bottom: size * 0.05, child: SizedBox(width: size*0.42, height: size*0.42, child: const DotWidget(mood: Mood.sleepy, isInPath: false, isLast: false))),
         ],
       ),
     );
   }
 }
 """,
-
         "lib/widgets/game_button.dart": r"""
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/game_settings.dart';
+import '../core/audio_manager.dart';
 
 class GameButton extends StatefulWidget {
   final String title;
@@ -609,13 +650,7 @@ class GameButton extends StatefulWidget {
   final bool isSmall;
 
   const GameButton({
-    Key? key,
-    required this.title,
-    required this.color,
-    required this.shadowColor,
-    required this.onTap,
-    this.icon,
-    this.isSmall = false,
+    Key? key, required this.title, required this.color, required this.shadowColor, required this.onTap, this.icon, this.isSmall = false,
   }) : super(key: key);
 
   @override
@@ -634,48 +669,34 @@ class _GameButtonState extends State<GameButton> with SingleTickerProviderStateM
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  void dispose() { _controller.dispose(); super.dispose(); }
 
   void _onTapDown(TapDownDetails details) {
     if (GameSettings.hapticsOn) HapticFeedback.lightImpact();
+    AudioManager.playClick();
     _controller.forward();
   }
   
-  void _onTapUp(TapUpDetails details) {
-    _controller.reverse();
-    widget.onTap();
-  }
-  
+  void _onTapUp(TapUpDetails details) { _controller.reverse(); widget.onTap(); }
   void _onTapCancel() => _controller.reverse();
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: _onTapDown,
-      onTapUp: _onTapUp,
-      onTapCancel: _onTapCancel,
+      onTapDown: _onTapDown, onTapUp: _onTapUp, onTapCancel: _onTapCancel,
       child: ScaleTransition(
         scale: _scaleAnimation,
         child: Container(
           width: widget.isSmall ? null : 240,
           padding: EdgeInsets.symmetric(vertical: widget.isSmall ? 12 : 18, horizontal: widget.isSmall ? 20 : 0),
           decoration: BoxDecoration(
-            color: widget.color,
-            borderRadius: BorderRadius.circular(30),
-            border: Border(bottom: BorderSide(color: widget.shadowColor, width: 6)),
+            color: widget.color, borderRadius: BorderRadius.circular(30), border: Border(bottom: BorderSide(color: widget.shadowColor, width: 6)),
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: widget.isSmall ? MainAxisSize.min : MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.center, mainAxisSize: widget.isSmall ? MainAxisSize.min : MainAxisSize.max,
             children: [
               if (widget.icon != null) ...[Icon(widget.icon, color: Colors.white, size: widget.isSmall ? 20 : 28), const SizedBox(width: 10)],
-              Text(
-                widget.title,
-                style: TextStyle(fontSize: widget.isSmall ? 16 : 22, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1.5),
-              ),
+              Text(widget.title, style: TextStyle(fontSize: widget.isSmall ? 16 : 22, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1.5)),
             ],
           ),
         ),
@@ -708,13 +729,11 @@ class _GameIconButtonState extends State<GameIconButton> with SingleTickerProvid
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  void dispose() { _controller.dispose(); super.dispose(); }
 
   void _onTapDown(TapDownDetails details) {
     if (GameSettings.hapticsOn) HapticFeedback.lightImpact();
+    AudioManager.playClick();
     _controller.forward();
   }
   void _onTapUp(TapUpDetails details) { _controller.reverse(); widget.onTap(); }
@@ -729,9 +748,7 @@ class _GameIconButtonState extends State<GameIconButton> with SingleTickerProvid
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: widget.color,
-            shape: BoxShape.circle,
-            border: Border(bottom: BorderSide(color: widget.shadowColor, width: 4)),
+            color: widget.color, shape: BoxShape.circle, border: Border(bottom: BorderSide(color: widget.shadowColor, width: 4)),
             boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 4))],
           ),
           child: Icon(widget.icon, color: Colors.white, size: 32),
@@ -741,7 +758,6 @@ class _GameIconButtonState extends State<GameIconButton> with SingleTickerProvid
   }
 }
 """,
-
         "lib/widgets/animated_background.dart": r"""
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
@@ -754,35 +770,20 @@ class AnimatedBackground extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppTheme.backgroundLight, AppTheme.backgroundDark],
-          stops: [0.3, 1.0],
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          colors: [AppTheme.backgroundLight, AppTheme.backgroundDark], stops: [0.3, 1.0],
         ),
       ),
       child: Stack(
         children: [
-          Positioned(
-            top: -150, right: -150,
-            child: Container(
-              width: 400, height: 400,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.primary.withOpacity(0.03)),
-            ),
-          ),
-          Positioned(
-            bottom: -200, left: -100,
-            child: Container(
-              width: 500, height: 500,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.secondary.withOpacity(0.03)),
-            ),
-          ),
+          Positioned(top: -150, right: -150, child: Container(width: 400, height: 400, decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.primary.withOpacity(0.03)))),
+          Positioned(bottom: -200, left: -100, child: Container(width: 500, height: 500, decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.secondary.withOpacity(0.03)))),
         ],
       ),
     );
   }
 }
 """,
-
         "lib/screens/splash_screen.dart": r"""
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
@@ -817,10 +818,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  void dispose() { _controller.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
@@ -834,7 +832,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: const [
-                  GameLogoWidget(size: 220), 
+                  GameLogoWidget(size: 260), 
                   SizedBox(height: 30),
                   Text('Mood Mesh', style: TextStyle(fontSize: 46, fontWeight: FontWeight.w900, color: AppTheme.textDark, letterSpacing: 2.0)),
                   SizedBox(height: 10),
@@ -849,7 +847,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 }
 """,
-
         "lib/screens/home_screen.dart": r"""
 import 'package:flutter/material.dart';
 import 'game_screen.dart';
@@ -862,6 +859,7 @@ import '../widgets/game_button.dart';
 import '../core/game_settings.dart';
 import '../core/storage_manager.dart';
 import '../core/ad_manager.dart';
+import '../core/audio_manager.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/game_logo.dart';
 
@@ -879,18 +877,30 @@ class _HomeScreenState extends State<HomeScreen> {
     if (GameSettings.lastDailyPuzzleDate == today) {
       showDialog(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (context) => Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('🌟 All Done!', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.primary, fontSize: 26)),
-          content: const Text(
-            'You have already conquered today\'s daily puzzle.\n\nCome back tomorrow for a brand new challenge!', 
-            textAlign: TextAlign.center, 
-            style: TextStyle(fontSize: 18, color: AppTheme.textDark, fontWeight: FontWeight.w600)
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 20, offset: Offset(0, 10))],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.star_rounded, color: AppTheme.primary, size: 80),
+                const SizedBox(height: 10),
+                const Text('All Done!', style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.primary, fontSize: 32)),
+                const SizedBox(height: 15),
+                const Text('You have already conquered today\'s daily puzzle.\n\nCome back tomorrow for a brand new challenge!', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, color: AppTheme.textDark, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 30),
+                GameButton(title: 'GOT IT', color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, isSmall: true, onTap: () => Navigator.pop(context))
+              ],
+            ),
           ),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: [
-            GameButton(title: 'GOT IT', color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, isSmall: true, onTap: () => Navigator.pop(context))
-          ],
         )
       );
     } else {
@@ -903,13 +913,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ad is still loading. Please try again in a moment!')));
       return;
     }
-    
     AdManager.instance.showRewardedAd(() {
-      setState(() {
-        GameSettings.totalCoins += 50;
-      });
+      setState(() => GameSettings.totalCoins += 10);
       StorageManager.saveEconomy();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reward Earned: +50 Coins!', style: TextStyle(fontWeight: FontWeight.bold))));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reward Earned: +10 Coins!', style: TextStyle(fontWeight: FontWeight.bold))));
     });
   }
 
@@ -936,8 +943,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: AppTheme.white,
-                          borderRadius: BorderRadius.circular(20),
+                          color: AppTheme.white, borderRadius: BorderRadius.circular(20),
                           boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
                           border: Border.all(color: const Color(0xFFE5E9F0), width: 2),
                         ),
@@ -967,33 +973,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 50),
                       
                       GameButton(
-                        title: 'PLAY LEVEL $currentLevel',
-                        icon: Icons.play_arrow_rounded,
-                        color: AppTheme.primary,
-                        shadowColor: AppTheme.primaryDark,
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelSelectScreen())).then((_) => setState(() {})); 
-                        },
+                        title: 'PLAY LEVEL $currentLevel', icon: Icons.play_arrow_rounded, color: AppTheme.primary, shadowColor: AppTheme.primaryDark,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelSelectScreen())).then((_) => setState(() {})),
                       ),
                       const SizedBox(height: 15),
-                      
-                      GameButton(
-                        title: 'DAILY PUZZLE',
-                        icon: Icons.calendar_month_rounded,
-                        color: AppTheme.accent,
-                        shadowColor: AppTheme.accentDark,
-                        onTap: _playDailyPuzzle,
-                      ),
+                      GameButton(title: 'DAILY PUZZLE', icon: Icons.calendar_month_rounded, color: AppTheme.accent, shadowColor: AppTheme.accentDark, onTap: _playDailyPuzzle),
                       const SizedBox(height: 15),
-                      
-                      GameButton(
-                        title: 'WATCH AD (+50🪙)',
-                        icon: Icons.ondemand_video_rounded,
-                        color: AppTheme.success,
-                        shadowColor: AppTheme.successDark,
-                        isSmall: true,
-                        onTap: _watchAdForCoins,
-                      ),
+                      GameButton(title: 'WATCH AD (+10🪙)', icon: Icons.ondemand_video_rounded, color: AppTheme.success, shadowColor: AppTheme.successDark, isSmall: true, onTap: _watchAdForCoins),
                     ],
                   ),
                 ),
@@ -1007,27 +993,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildIconButton(IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        AudioManager.playClick();
+        onTap();
+      },
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
-          border: Border.all(color: const Color(0xFFE5E9F0), width: 2),
-        ),
+        decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))], border: Border.all(color: const Color(0xFFE5E9F0), width: 2)),
         child: Icon(icon, color: color, size: 28),
       ),
     );
   }
 }
 """,
-
         "lib/screens/themes_screen.dart": r"""
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/game_settings.dart';
 import '../core/storage_manager.dart';
+import '../core/audio_manager.dart';
 import '../widgets/animated_background.dart';
 
 class ThemesScreen extends StatefulWidget {
@@ -1066,6 +1050,7 @@ class _ThemesScreenState extends State<ThemesScreen> {
 
                   return GestureDetector(
                     onTap: isLocked ? null : () {
+                      AudioManager.playClick();
                       setState(() => GameSettings.currentTheme = theme['id']);
                       StorageManager.saveSettings();
                     },
@@ -1097,7 +1082,6 @@ class _ThemesScreenState extends State<ThemesScreen> {
   }
 }
 """,
-
         "lib/screens/settings_screen.dart": r"""
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
@@ -1132,17 +1116,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Column(
                       children: [
                         _buildToggle('Sound Effects', Icons.volume_up_rounded, GameSettings.soundOn, (val) {
+                          AudioManager.playClick();
                           setState(() => GameSettings.soundOn = val);
                           StorageManager.saveSettings();
                         }),
                         const Divider(height: 1),
                         _buildToggle('Music', Icons.music_note_rounded, GameSettings.musicOn, (val) {
+                          AudioManager.playClick();
                           setState(() => GameSettings.musicOn = val);
                           StorageManager.saveSettings();
                           val ? AudioManager.playBgm() : AudioManager.stopBgm();
                         }),
                         const Divider(height: 1),
                         _buildToggle('Haptics', Icons.vibration_rounded, GameSettings.hapticsOn, (val) {
+                          AudioManager.playClick();
                           setState(() => GameSettings.hapticsOn = val);
                           StorageManager.saveSettings();
                         }),
@@ -1168,7 +1155,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 """,
-
         "lib/screens/level_select_screen.dart": r"""
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1176,6 +1162,7 @@ import 'game_screen.dart';
 import '../core/app_theme.dart';
 import '../core/level_data.dart';
 import '../core/game_settings.dart';
+import '../core/audio_manager.dart';
 import '../widgets/animated_background.dart';
 
 class LevelSelectScreen extends StatefulWidget {
@@ -1198,11 +1185,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
             child: Padding(
               padding: const EdgeInsets.all(20.0),
               child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 20, mainAxisSpacing: 20),
                 itemCount: LevelData.allLevels.length, 
                 itemBuilder: (context, index) {
                   final level = LevelData.allLevels[index];
@@ -1212,6 +1195,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                   return GestureDetector(
                     onTap: isUnlocked ? () async {
                       if (GameSettings.hapticsOn) HapticFeedback.lightImpact();
+                      AudioManager.playClick();
                       await Navigator.push(context, MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: false)));
                       setState(() {}); 
                     } : null,
@@ -1225,30 +1209,18 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                       child: isUnlocked 
                           ? Stack(
                               children: [
-                                Center(
-                                  child: Text('${level.id}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white)),
-                                ),
+                                Center(child: Text('${level.id}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white))),
                                 if (level.id < LevelData.maxUnlockedLevel || stars > 0)
                                   Positioned(
-                                    bottom: 8,
-                                    left: 0,
-                                    right: 0,
+                                    bottom: 8, left: 0, right: 0,
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
-                                      children: List.generate(3, (starIndex) {
-                                        return Icon(
-                                          Icons.star_rounded,
-                                          size: 16,
-                                          color: starIndex < stars ? Colors.white : Colors.black12,
-                                        );
-                                      }),
+                                      children: List.generate(3, (starIndex) => Icon(Icons.star_rounded, size: 16, color: starIndex < stars ? Colors.white : Colors.black12)),
                                     ),
                                   ),
                               ],
                             )
-                          : const Center(
-                              child: Icon(Icons.lock_rounded, color: Colors.black26, size: 36),
-                            ),
+                          : const Center(child: Icon(Icons.lock_rounded, color: Colors.black26, size: 36)),
                     ),
                   );
                 },
@@ -1261,7 +1233,6 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
   }
 }
 """,
-
         "lib/screens/game_screen.dart": r"""
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1270,6 +1241,7 @@ import '../core/app_theme.dart';
 import '../core/game_settings.dart';
 import '../core/storage_manager.dart';
 import '../core/audio_manager.dart';
+import '../core/ad_manager.dart';
 import '../widgets/dot_widget.dart';
 import '../widgets/path_painter.dart';
 import '../widgets/game_button.dart';
@@ -1330,32 +1302,22 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     }
     
     if (bestPath.length > 1) {
-      AudioManager.playPop(); // Reusing pop for generic good notification
-      setState(() {
-        hintedPath = List.from(bestPath);
-        isHintActive = true;
-      });
-      StorageManager.saveEconomy(); // Save updated hints/coins
+      AudioManager.playClick();
+      setState(() { hintedPath = List.from(bestPath); isHintActive = true; });
+      StorageManager.saveEconomy(); 
     }
   }
 
   void _dfsFindPath(int current, List<int> currentPath, List<int> bestPath) {
-    if (currentPath.length > bestPath.length) {
-      bestPath.clear();
-      bestPath.addAll(currentPath);
-    }
-    int r = current ~/ widget.level.cols;
-    int c = current % widget.level.cols;
+    if (currentPath.length > bestPath.length) { bestPath.clear(); bestPath.addAll(currentPath); }
+    int r = current ~/ widget.level.cols; int c = current % widget.level.cols;
     List<List<int>> dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-    
     for (var d in dirs) {
       int nr = r + d[0], nc = c + d[1];
       if (nr >= 0 && nr < widget.level.rows && nc >= 0 && nc < widget.level.cols) {
         int nIdx = nr * widget.level.cols + nc;
         if (grid[nIdx] == Mood.happy && !currentPath.contains(nIdx)) {
-          currentPath.add(nIdx);
-          _dfsFindPath(nIdx, currentPath, bestPath);
-          currentPath.removeLast();
+          currentPath.add(nIdx); _dfsFindPath(nIdx, currentPath, bestPath); currentPath.removeLast();
         }
       }
     }
@@ -1363,43 +1325,26 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
 
   void _useHint() {
     if (movesLeft <= 0 || isProcessing || isHintActive) return;
-
     if (GameSettings.availableHints > 0) {
-      setState(() => GameSettings.availableHints--);
-      _executeHint();
+      setState(() => GameSettings.availableHints--); _executeHint();
     } else if (GameSettings.totalCoins >= GameSettings.hintCost) {
-      setState(() => GameSettings.totalCoins -= GameSettings.hintCost);
-      _executeHint();
+      setState(() => GameSettings.totalCoins -= GameSettings.hintCost); _executeHint();
     } else {
       if (GameSettings.hapticsOn) HapticFeedback.heavyImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Not enough coins for a hint!', style: TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: AppTheme.accent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        )
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Not enough coins for a hint!', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: AppTheme.accent, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))));
     }
   }
 
   void _triggerRipple() async {
-    if (path.length <= 1) {
-      setState(() => path.clear());
-      return;
-    }
+    if (path.length <= 1) { setState(() => path.clear()); return; }
 
     if (GameSettings.hapticsOn) HapticFeedback.mediumImpact();
     setState(() => isProcessing = true);
     
-    Set<int> pathSet = path.toSet();
-    Set<int> neighborsToChange = {};
-
+    Set<int> pathSet = path.toSet(); Set<int> neighborsToChange = {};
     for (int idx in path) {
-      int r = idx ~/ widget.level.cols;
-      int c = idx % widget.level.cols;
+      int r = idx ~/ widget.level.cols; int c = idx % widget.level.cols;
       List<List<int>> potentialNeighbors = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]];
-
       for (var n in potentialNeighbors) {
         int nr = n[0], nc = n[1];
         if (nr >= 0 && nr < widget.level.rows && nc >= 0 && nc < widget.level.cols) {
@@ -1410,51 +1355,35 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     }
 
     await Future.delayed(const Duration(milliseconds: 150));
-
     setState(() {
       for (int nIdx in neighborsToChange) {
         if (grid[nIdx] == Mood.happy) grid[nIdx] = Mood.angry;
         else if (grid[nIdx] == Mood.angry) grid[nIdx] = Mood.sleepy;
         else grid[nIdx] = Mood.happy;
       }
-      movesLeft--;
-      path.clear();
-      isProcessing = false;
-      _checkWinLoss();
+      movesLeft--; path.clear(); isProcessing = false; _checkWinLoss();
     });
   }
 
   void _checkWinLoss() {
     bool isWin = grid.every((mood) => mood == Mood.happy);
     if (isWin) {
-      AudioManager.playWin();
-      if (GameSettings.hapticsOn) HapticFeedback.vibrate();
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LevelCompleteScreen(level: widget.level, movesLeft: movesLeft, isDaily: widget.isDaily)));
     } else if (movesLeft <= 0) {
-      // Could add playLose() here if asset added
       if (GameSettings.hapticsOn) HapticFeedback.heavyImpact();
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameOverScreen(level: widget.level, isDaily: widget.isDaily)));
     }
   }
 
   void _handlePanStart(Offset localPosition, Size boardSize) {
-    if (isHintActive) {
-      setState(() {
-        isHintActive = false;
-        hintedPath.clear();
-      });
-    }
+    if (isHintActive) { setState(() { isHintActive = false; hintedPath.clear(); }); }
     _handlePanUpdate(localPosition, boardSize);
   }
 
   void _handlePanUpdate(Offset localPosition, Size boardSize) {
     if (isProcessing) return;
-
-    double cellWidth = boardSize.width / widget.level.cols;
-    double cellHeight = boardSize.height / widget.level.rows;
-    int c = (localPosition.dx / cellWidth).floor();
-    int r = (localPosition.dy / cellHeight).floor();
-
+    double cellWidth = boardSize.width / widget.level.cols; double cellHeight = boardSize.height / widget.level.rows;
+    int c = (localPosition.dx / cellWidth).floor(); int r = (localPosition.dy / cellHeight).floor();
     if (c < 0 || c >= widget.level.cols || r < 0 || r >= widget.level.rows) return;
     int idx = r * widget.level.cols + c;
 
@@ -1462,7 +1391,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       if (grid[idx] == Mood.happy) {
         setState(() => path.add(idx));
         if (GameSettings.hapticsOn) HapticFeedback.selectionClick();
-        AudioManager.playPop();
+        AudioManager.playPop(); 
       }
       return;
     }
@@ -1474,15 +1403,13 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     }
 
     if (!path.contains(idx)) {
-      int lastIdx = path.last;
-      int lastR = lastIdx ~/ widget.level.cols;
-      int lastC = lastIdx % widget.level.cols;
+      int lastIdx = path.last; int lastR = lastIdx ~/ widget.level.cols; int lastC = lastIdx % widget.level.cols;
       bool isAdjacent = (r - lastR).abs() + (c - lastC).abs() == 1;
 
       if (isAdjacent && grid[idx] == Mood.happy) {
         setState(() => path.add(idx));
         if (GameSettings.hapticsOn) HapticFeedback.selectionClick();
-        AudioManager.playPop();
+        AudioManager.playPop(); 
       }
     }
   }
@@ -1493,6 +1420,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     bool hasFreeHints = GameSettings.availableHints > 0;
 
     return Scaffold(
+      bottomNavigationBar: const BannerAdWidget(), 
       body: Stack(
         children: [
           const AnimatedBackground(),
@@ -1539,41 +1467,16 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                                 padding: const EdgeInsets.all(10),
                                 child: Stack(
                                   children: [
-                                    // 1. Neon Pulsing Hint Path (Underneath)
                                     if (isHintActive && hintedPath.isNotEmpty)
                                       AnimatedBuilder(
                                         animation: _hintPulseController,
                                         builder: (context, child) {
-                                          return CustomPaint(
-                                            size: constraints.biggest,
-                                            painter: PathPainter(
-                                              path: hintedPath, 
-                                              cols: widget.level.cols, 
-                                              rows: widget.level.rows,
-                                              pathColor: AppTheme.neonBlue, 
-                                              strokeWidth: 20.0, 
-                                              isNeon: true,
-                                              pulseValue: _hintPulseController.value
-                                            ),
-                                          );
+                                          return CustomPaint(size: constraints.biggest, painter: PathPainter(path: hintedPath, cols: widget.level.cols, rows: widget.level.rows, pathColor: AppTheme.neonBlue, strokeWidth: 20.0, isNeon: true, pulseValue: _hintPulseController.value));
                                         }
                                       ),
-                                    
-                                    // 2. Solid Player Draw Path
                                     if (path.isNotEmpty)
-                                      CustomPaint(
-                                        size: constraints.biggest,
-                                        painter: PathPainter(
-                                          path: path, 
-                                          cols: widget.level.cols, 
-                                          rows: widget.level.rows,
-                                          pathColor: Colors.white, 
-                                          strokeWidth: 18.0,
-                                          isNeon: false,
-                                        ),
-                                      ),
+                                      CustomPaint(size: constraints.biggest, painter: PathPainter(path: path, cols: widget.level.cols, rows: widget.level.rows, pathColor: Colors.white, strokeWidth: 18.0, isNeon: false)),
 
-                                    // 3. The Grid
                                     GridView.builder(
                                       physics: const NeverScrollableScrollPhysics(),
                                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: widget.level.cols),
@@ -1581,13 +1484,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                                       itemBuilder: (context, index) {
                                         return Padding(
                                           padding: const EdgeInsets.all(8.0),
-                                          child: DotWidget(
-                                            key: ValueKey(index),
-                                            mood: grid[index],
-                                            isInPath: path.contains(index),
-                                            isLast: path.isNotEmpty && path.last == index,
-                                            isHighlighted: false, 
-                                          ),
+                                          child: DotWidget(mood: grid[index], isInPath: path.contains(index), isLast: path.isNotEmpty && path.last == index, isHighlighted: false),
                                         );
                                       },
                                     ),
@@ -1603,14 +1500,8 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                   const SizedBox(height: 20),
                   
                   GameButton(
-                    title: hasFreeHints 
-                        ? 'USE HINT (${GameSettings.availableHints})' 
-                        : 'BUY HINT (${GameSettings.hintCost}🪙)',
-                    icon: Icons.lightbulb_rounded,
-                    color: hasFreeHints ? AppTheme.primary : AppTheme.coinGold,
-                    shadowColor: hasFreeHints ? AppTheme.primaryDark : AppTheme.coinDark,
-                    isSmall: true,
-                    onTap: _useHint,
+                    title: hasFreeHints ? 'USE HINT (${GameSettings.availableHints})' : 'BUY HINT (${GameSettings.hintCost}🪙)',
+                    icon: Icons.lightbulb_rounded, color: hasFreeHints ? AppTheme.primary : AppTheme.coinGold, shadowColor: hasFreeHints ? AppTheme.primaryDark : AppTheme.coinDark, isSmall: true, onTap: _useHint,
                   ),
                   const SizedBox(height: 20),
                 ],
@@ -1623,7 +1514,6 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
   }
 }
 """,
-
         "lib/screens/level_complete_screen.dart": r"""
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
@@ -1634,6 +1524,8 @@ import '../core/app_theme.dart';
 import '../core/level_data.dart';
 import '../core/game_settings.dart';
 import '../core/storage_manager.dart';
+import '../core/audio_manager.dart';
+import '../core/ad_manager.dart';
 import '../widgets/game_button.dart';
 import '../widgets/animated_background.dart';
 
@@ -1661,22 +1553,16 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
   @override
   void initState() {
     super.initState();
+    
+    AudioManager.playWin();
+
     _confettiController = ConfettiController(duration: const Duration(seconds: 3));
     
-    if (!widget.isDaily && widget.level.id < LevelData.maxUnlockedLevel) {
-      isReplay = true;
-    }
+    if (!widget.isDaily && widget.level.id < LevelData.maxUnlockedLevel) { isReplay = true; }
 
-    if (widget.movesLeft >= widget.level.movesFor3Stars) {
-      targetStars = 3;
-      coinsEarned = isReplay ? 0 : 30; 
-    } else if (widget.movesLeft >= widget.level.movesFor2Stars) {
-      targetStars = 2;
-      coinsEarned = isReplay ? 0 : 20;
-    } else {
-      targetStars = 1;
-      coinsEarned = isReplay ? 0 : 10;
-    }
+    if (widget.movesLeft >= widget.level.movesFor3Stars) { targetStars = 3; coinsEarned = isReplay ? 0 : 30; } 
+    else if (widget.movesLeft >= widget.level.movesFor2Stars) { targetStars = 2; coinsEarned = isReplay ? 0 : 20; } 
+    else { targetStars = 1; coinsEarned = isReplay ? 0 : 10; }
     
     if (!isReplay && !widget.isDaily) {
       GameSettings.totalCoins += coinsEarned;
@@ -1686,11 +1572,8 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
       GameSettings.totalCoins += coinsEarned;
     }
 
-    if (!widget.isDaily) {
-      LevelData.saveStars(widget.level.id, targetStars);
-    }
+    if (!widget.isDaily) { LevelData.saveStars(widget.level.id, targetStars); }
     
-    // Save to device
     StorageManager.saveEconomy();
     StorageManager.saveProgress(widget.level.id, targetStars);
 
@@ -1699,20 +1582,32 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
   }
   
   @override
-  void dispose() {
-    _confettiController.dispose();
-    super.dispose();
-  }
+  void dispose() { _confettiController.dispose(); super.dispose(); }
 
   void _animateStars() async {
     await Future.delayed(const Duration(milliseconds: 300));
     if (mounted && targetStars >= 1) setState(() => _star1Scale = 1.0);
-    
     await Future.delayed(const Duration(milliseconds: 400));
     if (mounted && targetStars >= 2) setState(() => _star2Scale = 1.0);
-    
     await Future.delayed(const Duration(milliseconds: 400));
     if (mounted && targetStars >= 3) setState(() => _star3Scale = 1.0);
+  }
+  
+  void _onNextOrHome(bool isNext) {
+    if (!widget.isDaily && widget.level.id % 5 == 0) {
+      AdManager.instance.showInterstitialIfReady();
+    }
+    
+    if (isNext) {
+      int nextId = widget.level.id + 1;
+      if (nextId <= LevelData.allLevels.length) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: LevelData.getLevel(nextId))));
+      } else {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+      }
+    } else {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+    }
   }
 
   @override
@@ -1721,95 +1616,52 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
       body: Stack(
         children: [
           const AnimatedBackground(), 
-          
           Align(
             alignment: Alignment.topCenter,
             child: ConfettiWidget(
-              confettiController: _confettiController,
-              blastDirectionality: BlastDirectionality.explosive,
-              emissionFrequency: 0.05,
-              numberOfParticles: 20,
-              maxBlastForce: 100,
-              minBlastForce: 80,
-              gravity: 0.1,
-              colors: const [AppTheme.primary, AppTheme.secondary, AppTheme.accent, AppTheme.success],
+              confettiController: _confettiController, blastDirectionality: BlastDirectionality.explosive, emissionFrequency: 0.05, numberOfParticles: 20, maxBlastForce: 100, minBlastForce: 80, gravity: 0.1, colors: const [AppTheme.primary, AppTheme.secondary, AppTheme.accent, AppTheme.success],
             ),
           ),
-
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text('🎉', style: TextStyle(fontSize: 100)),
                 const SizedBox(height: 10),
-                Text(
-                  widget.isDaily ? 'DAILY PUZZLE DONE!' : 'LEVEL CLEARED!',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppTheme.success),
-                ),
+                Text(widget.isDaily ? 'DAILY PUZZLE DONE!' : 'LEVEL CLEARED!', textAlign: TextAlign.center, style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppTheme.success)),
                 const SizedBox(height: 30),
-                
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     AnimatedScale(scale: _star1Scale, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: Icon(Icons.star_rounded, size: 70, color: AppTheme.primary)),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 40.0, left: 10, right: 10),
-                      child: AnimatedScale(scale: _star2Scale, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: Icon(Icons.star_rounded, size: 90, color: AppTheme.primary)),
-                    ),
+                    Padding(padding: const EdgeInsets.only(bottom: 40.0, left: 10, right: 10), child: AnimatedScale(scale: _star2Scale, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: Icon(Icons.star_rounded, size: 90, color: AppTheme.primary))),
                     AnimatedScale(scale: _star3Scale, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: Icon(Icons.star_rounded, size: 70, color: AppTheme.primary)),
                   ],
                 ),
                 const SizedBox(height: 20),
-
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
                   decoration: BoxDecoration(color: AppTheme.white, borderRadius: BorderRadius.circular(30), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))], border: Border.all(color: const Color(0xFFE5E9F0), width: 2)),
-                  child: isReplay 
-                    ? const Text('REPLAY - NO COINS 🪙', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.textLight))
+                  child: isReplay ? const Text('REPLAY - NO COINS 🪙', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.textLight))
                     : Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.monetization_on_rounded, color: AppTheme.coinGold, size: 36),
-                        const SizedBox(width: 10),
-                        TweenAnimationBuilder<int>(
-                          tween: IntTween(begin: 0, end: coinsEarned),
-                          duration: const Duration(milliseconds: 1500),
-                          curve: Curves.easeOutQuart,
-                          builder: (context, value, child) {
-                            return Text('+$value COINS', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.textDark));
-                          }
-                        ),
+                        const Icon(Icons.monetization_on_rounded, color: AppTheme.coinGold, size: 36), const SizedBox(width: 10),
+                        TweenAnimationBuilder<int>(tween: IntTween(begin: 0, end: coinsEarned), duration: const Duration(milliseconds: 1500), curve: Curves.easeOutQuart, builder: (context, value, child) { return Text('+$value COINS', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.textDark)); }),
                       ],
                     ),
                 ),
                 const SizedBox(height: 40),
-
                 if (!widget.isDaily) ...[
-                  GameButton(
-                    title: 'NEXT LEVEL',
-                    icon: Icons.fast_forward_rounded,
-                    color: AppTheme.success,
-                    shadowColor: AppTheme.successDark,
-                    onTap: () {
-                      int nextId = widget.level.id + 1;
-                      if (nextId <= LevelData.allLevels.length) {
-                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: LevelData.getLevel(nextId))));
-                      } else {
-                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-                      }
-                    },
-                  ),
+                  GameButton(title: 'NEXT LEVEL', icon: Icons.fast_forward_rounded, color: AppTheme.success, shadowColor: AppTheme.successDark, onTap: () => _onNextOrHome(true)),
                   const SizedBox(height: 20),
                 ],
-
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    GameButton(title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, isSmall: true, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()))),
+                    GameButton(title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, isSmall: true, onTap: () => _onNextOrHome(false)),
                     const SizedBox(width: 15),
-                    if (!widget.isDaily) 
-                      GameButton(title: 'REPLAY', icon: Icons.replay_rounded, color: AppTheme.primary, shadowColor: AppTheme.primaryDark, isSmall: true, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily)))),
+                    if (!widget.isDaily) GameButton(title: 'REPLAY', icon: Icons.replay_rounded, color: AppTheme.primary, shadowColor: AppTheme.primaryDark, isSmall: true, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily)))),
                   ],
                 )
               ],
@@ -1821,7 +1673,6 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
   }
 }
 """,
-
         "lib/screens/game_over_screen.dart": r"""
 import 'package:flutter/material.dart';
 import 'game_screen.dart';
@@ -1849,13 +1700,10 @@ class _GameOverScreenState extends State<GameOverScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ad is still loading. Please try again in a moment!')));
       return;
     }
-    
     AdManager.instance.showRewardedAd(() {
-      setState(() {
-        GameSettings.totalCoins += 50;
-      });
+      setState(() => GameSettings.totalCoins += 10);
       StorageManager.saveEconomy();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reward Earned: +50 Coins! Buy hints with them.', style: TextStyle(fontWeight: FontWeight.bold))));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reward Earned: +10 Coins! Buy hints with them.', style: TextStyle(fontWeight: FontWeight.bold))));
     });
   }
 
@@ -1876,27 +1724,11 @@ class _GameOverScreenState extends State<GameOverScreen> {
                 const Text('Don\'t give up! Try a different path.', style: TextStyle(fontSize: 18, color: AppTheme.textDark, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 60),
 
-                GameButton(
-                  title: 'TRY AGAIN', icon: Icons.refresh_rounded, color: AppTheme.accent, shadowColor: AppTheme.accentDark,
-                  onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily))),
-                ),
+                GameButton(title: 'TRY AGAIN', icon: Icons.refresh_rounded, color: AppTheme.accent, shadowColor: AppTheme.accentDark, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily)))),
                 const SizedBox(height: 15),
-                
-                GameButton(
-                  title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark,
-                  onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen())),
-                ),
+                GameButton(title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()))),
                 const SizedBox(height: 30),
-
-                // Monetization Button
-                GameButton(
-                  title: 'WATCH AD (+50🪙)',
-                  icon: Icons.ondemand_video_rounded,
-                  color: AppTheme.success,
-                  shadowColor: AppTheme.successDark,
-                  isSmall: true,
-                  onTap: _watchAdForCoins,
-                ),
+                GameButton(title: 'WATCH AD (+10🪙)', icon: Icons.ondemand_video_rounded, color: AppTheme.success, shadowColor: AppTheme.successDark, isSmall: true, onTap: _watchAdForCoins),
               ],
             ),
           ),
@@ -1906,7 +1738,6 @@ class _GameOverScreenState extends State<GameOverScreen> {
   }
 }
 """,
-
         "lib/widgets/dot_widget.dart": r"""
 import 'package:flutter/material.dart';
 import '../models/level.dart';
@@ -1919,13 +1750,7 @@ class DotWidget extends StatelessWidget {
   final bool isLast;
   final bool isHighlighted;
 
-  const DotWidget({
-    Key? key, 
-    required this.mood, 
-    required this.isInPath, 
-    required this.isLast,
-    this.isHighlighted = false,
-  }) : super(key: key);
+  const DotWidget({Key? key, required this.mood, required this.isInPath, required this.isLast, this.isHighlighted = false}) : super(key: key);
 
   Color get moodColor {
     switch (mood) {
@@ -1938,113 +1763,52 @@ class DotWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedScale(
-      scale: isInPath ? 0.85 : 1.0,
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeOutBack,
+      scale: isInPath ? 0.85 : 1.0, duration: const Duration(milliseconds: 150), curve: Curves.easeOutBack,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
-          color: moodColor,
-          shape: BoxShape.circle,
+          color: moodColor, shape: BoxShape.circle,
           border: isLast ? Border.all(color: Colors.white, width: 5) : Border.all(color: Colors.black.withOpacity(0.05), width: 1),
-          boxShadow: isInPath ? [] : const [
-            BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 4)),
-            BoxShadow(color: Colors.white30, blurRadius: 2, offset: Offset(0, -2)) 
-          ],
+          boxShadow: isInPath ? [] : const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 4)), BoxShadow(color: Colors.white30, blurRadius: 2, offset: Offset(0, -2))],
         ),
-        child: Center(
-          child: Text(
-            GameSettings.getEmoji(mood.index),
-            style: const TextStyle(fontSize: 32),
-          ),
-        ),
+        child: Center(child: Text(GameSettings.getEmoji(mood.index), style: const TextStyle(fontSize: 32))),
       ),
     );
   }
 }
 """,
-
         "lib/widgets/path_painter.dart": r"""
 import 'package:flutter/material.dart';
 
 class PathPainter extends CustomPainter {
-  final List<int> path;
-  final int cols;
-  final int rows;
-  final Color pathColor;
-  final double strokeWidth;
-  final bool isNeon;
-  final double pulseValue;
-
-  PathPainter({
-    required this.path, 
-    required this.cols, 
-    required this.rows, 
-    required this.pathColor,
-    required this.strokeWidth,
-    this.isNeon = false,
-    this.pulseValue = 0.0,
-  });
+  final List<int> path; final int cols; final int rows; final Color pathColor; final double strokeWidth; final bool isNeon; final double pulseValue;
+  PathPainter({required this.path, required this.cols, required this.rows, required this.pathColor, required this.strokeWidth, this.isNeon = false, this.pulseValue = 0.0});
 
   @override
   void paint(Canvas canvas, Size size) {
     if (path.length < 2) return;
-
-    double cellWidth = size.width / cols;
-    double cellHeight = size.height / rows;
-    
+    double cellWidth = size.width / cols; double cellHeight = size.height / rows;
     Path fullPath = Path();
     for (int i = 0; i < path.length - 1; i++) {
-      int p1 = path[i];
-      int p2 = path[i + 1];
-
+      int p1 = path[i]; int p2 = path[i + 1];
       Offset start = Offset((p1 % cols) * cellWidth + cellWidth / 2, (p1 ~/ cols) * cellHeight + cellHeight / 2);
       Offset end = Offset((p2 % cols) * cellWidth + cellWidth / 2, (p2 ~/ cols) * cellHeight + cellHeight / 2);
-
       if (i == 0) fullPath.moveTo(start.dx, start.dy);
       fullPath.lineTo(end.dx, end.dy);
     }
-
     if (isNeon) {
-      final glowPaint = Paint()
-        ..color = pathColor.withOpacity(0.4 + (pulseValue * 0.6))
-        ..strokeWidth = strokeWidth * 1.5
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..style = PaintingStyle.stroke
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 10 + (pulseValue * 10));
+      final glowPaint = Paint()..color = pathColor.withOpacity(0.4 + (pulseValue * 0.6))..strokeWidth = strokeWidth * 1.5..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round..style = PaintingStyle.stroke..maskFilter = MaskFilter.blur(BlurStyle.normal, 10 + (pulseValue * 10));
       canvas.drawPath(fullPath, glowPaint);
-
-      final corePaint = Paint()
-        ..color = Colors.white
-        ..strokeWidth = strokeWidth * 0.4
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..style = PaintingStyle.stroke;
+      final corePaint = Paint()..color = Colors.white..strokeWidth = strokeWidth * 0.4..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round..style = PaintingStyle.stroke;
       canvas.drawPath(fullPath, corePaint);
-      
     } else {
-      final shadowPaint = Paint()
-        ..color = Colors.black26
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..style = PaintingStyle.stroke
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+      final shadowPaint = Paint()..color = Colors.black26..strokeWidth = strokeWidth..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round..style = PaintingStyle.stroke..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
       canvas.drawPath(fullPath, shadowPaint);
-
-      final normalPaint = Paint()
-        ..color = pathColor
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..style = PaintingStyle.stroke;
+      final normalPaint = Paint()..color = pathColor..strokeWidth = strokeWidth..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round..style = PaintingStyle.stroke;
       canvas.drawPath(fullPath, normalPaint);
     }
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  @override bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 """
     }
@@ -2052,56 +1816,46 @@ class PathPainter extends CustomPainter {
 def inject_files():
     if not os.path.exists("pubspec.yaml"):
         print("❌ ERROR: pubspec.yaml not found.")
-        print("Please place and run this script inside the root directory of your existing Flutter project.")
         sys.exit(1)
 
-    os.makedirs("assets/audio", exist_ok=True)
+    # 1. Auto-generate the placeholder audio files to prevent crashes
+    create_placeholder_audio()
     
-    # 1. Install all required dependencies
+    # 2. Install all required dependencies (including google_fonts)
     add_flutter_dependencies()
     
     # Configure pubspec.yaml for icons and assets
     configure_pubspec()
     
-    # 2. Inject Google AdMob Test IDs to prevent launch crashes
+    # 3. Inject Google AdMob Test IDs
     inject_admob_ids()
     
-    # 3. FIX ANDROID BUILD CONFIGURATION (minSdkVersion & ndkVersion)
+    # 4. Deeply and aggressively fix Android build configuration
     configure_android_build()
 
     print("\n📦 Injecting PRODUCTION GAME ARCHITECTURE into the current project...")
     
     dart_files = get_dart_files()
-    
     for relative_path, content in dart_files.items():
-        full_path = relative_path
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        
-        with open(full_path, 'w', encoding='utf-8') as f:
+        os.makedirs(os.path.dirname(relative_path), exist_ok=True)
+        with open(relative_path, 'w', encoding='utf-8') as f:
             f.write(content.strip() + "\n")
             
-        print(f"  ✅ Created/Updated: {relative_path}")
-
     test_file = os.path.join("test", "widget_test.dart")
-    if os.path.exists(test_file):
-        os.remove(test_file)
-        print("  🧹 Cleaned up default test file to prevent compile errors.")
+    if os.path.exists(test_file): os.remove(test_file)
 
     if os.path.exists("assets/mood_mash_icon.png"):
         print("\n🖼️ Generating native app icons...")
         subprocess.run(["flutter", "pub", "run", "flutter_launcher_icons"], check=True, shell=(os.name=='nt'))
-    else:
-        print("\n⚠️ Note: assets/mood_mash_icon.png not found. Please place it in the assets folder later and run 'flutter pub run flutter_launcher_icons'.")
 
     print("\n🧹 Cleaning and building project (this may take a minute)...")
     subprocess.run(["flutter", "clean"], check=True, shell=(os.name=='nt'))
     subprocess.run(["flutter", "pub", "get"], check=True, shell=(os.name=='nt'))
 
-    print("\n🎉 INJECTION COMPLETE! ALL BUILD FIXES AND 6 PRODUCTION ITEMS ARE IMPLEMENTED.")
+    print("\n🎉 INJECTION COMPLETE! ALL BUILD FIXES AND PRODUCTION ITEMS ARE IMPLEMENTED.")
     print("-" * 50)
     print("To run your fully monetized, saving, audio-ready game, execute:")
     print("  flutter run")
-    print("\nNote on Audio: Don't forget to drop your actual .mp3 files into the assets/audio folder!")
     print("-" * 50)
 
 if __name__ == "__main__":

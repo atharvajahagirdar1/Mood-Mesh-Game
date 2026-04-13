@@ -10,11 +10,12 @@ import 'screens/splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Core Services
   await StorageManager.init();
   await MobileAds.instance.initialize();
-  AudioManager.init();
+  await AudioManager.init();
+  
   AdManager.instance.loadRewardedAd();
+  AdManager.instance.loadInterstitialAd();
   
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((_) {
     runApp(const MoodMeshApp());

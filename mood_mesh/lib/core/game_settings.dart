@@ -4,7 +4,6 @@ class GameSettings {
   static bool musicOn = true;
   static bool hapticsOn = true;
   
-  // Economy & Progression
   static int totalCoins = 0;
   static int availableHints = 5; 
   static const int hintCost = 20;

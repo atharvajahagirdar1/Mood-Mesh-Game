@@ -9,13 +9,7 @@ class DotWidget extends StatelessWidget {
   final bool isLast;
   final bool isHighlighted;
 
-  const DotWidget({
-    Key? key, 
-    required this.mood, 
-    required this.isInPath, 
-    required this.isLast,
-    this.isHighlighted = false,
-  }) : super(key: key);
+  const DotWidget({Key? key, required this.mood, required this.isInPath, required this.isLast, this.isHighlighted = false}) : super(key: key);
 
   Color get moodColor {
     switch (mood) {
@@ -28,26 +22,15 @@ class DotWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedScale(
-      scale: isInPath ? 0.85 : 1.0,
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeOutBack,
+      scale: isInPath ? 0.85 : 1.0, duration: const Duration(milliseconds: 150), curve: Curves.easeOutBack,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
-          color: moodColor,
-          shape: BoxShape.circle,
+          color: moodColor, shape: BoxShape.circle,
           border: isLast ? Border.all(color: Colors.white, width: 5) : Border.all(color: Colors.black.withOpacity(0.05), width: 1),
-          boxShadow: isInPath ? [] : const [
-            BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 4)),
-            BoxShadow(color: Colors.white30, blurRadius: 2, offset: Offset(0, -2)) 
-          ],
+          boxShadow: isInPath ? [] : const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 4)), BoxShadow(color: Colors.white30, blurRadius: 2, offset: Offset(0, -2))],
         ),
-        child: Center(
-          child: Text(
-            GameSettings.getEmoji(mood.index),
-            style: const TextStyle(fontSize: 32),
-          ),
-        ),
+        child: Center(child: Text(GameSettings.getEmoji(mood.index), style: const TextStyle(fontSize: 32))),
       ),
     );
   }
