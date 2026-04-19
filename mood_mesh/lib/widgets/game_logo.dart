@@ -5,7 +5,7 @@ import '../core/app_theme.dart';
 
 class GameLogoWidget extends StatelessWidget {
   final double size;
-  const GameLogoWidget({Key? key, this.size = 200}) : super(key: key);
+  const GameLogoWidget({super.key, this.size = 200});
 
   @override
   Widget build(BuildContext context) {

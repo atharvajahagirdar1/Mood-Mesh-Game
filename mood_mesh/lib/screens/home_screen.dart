@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'game_screen.dart';
-import 'settings_screen.dart';
+import 'profile_screen.dart';
 import 'themes_screen.dart';
 import 'level_select_screen.dart';
 import '../core/app_theme.dart';
@@ -14,10 +15,10 @@ import '../widgets/animated_background.dart';
 import '../widgets/game_logo.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
@@ -54,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
         )
       );
     } else {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => GameScreen(level: LevelData.dailyLevel, isDaily: true))).then((_) => setState(() {})); 
+      _navigateTo(GameScreen(level: LevelData.dailyLevel, isDaily: true)); 
     }
   }
 
@@ -67,6 +68,25 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => GameSettings.totalCoins += 10);
       StorageManager.saveEconomy();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reward Earned: +10 Coins!', style: TextStyle(fontWeight: FontWeight.bold))));
+    });
+  }
+
+  // SMOOTH FADE NAVIGATION TO FIX GLITCHING ANIMATIONS
+  void _navigateTo(Widget screen) {
+    if (GameSettings.hapticsOn) { HapticFeedback.lightImpact(); }
+    AudioManager.playClick();
+    
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => screen,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 250),
+      ),
+    ).then((_) {
+      if (mounted) { setState(() {}); }
     });
   }
 
@@ -86,10 +106,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildIconButton(Icons.palette_rounded, AppTheme.secondary, () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ThemesScreen())).then((_) => setState(() {}));
-                      }),
+                      // Themes Button
+                      GestureDetector(
+                        onTap: () => _navigateTo(const ThemesScreen()),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))], border: Border.all(color: const Color(0xFFE5E9F0), width: 2)),
+                          child: const Icon(Icons.palette_rounded, color: AppTheme.secondary, size: 28),
+                        ),
+                      ),
                       
+                      // Coins Display
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
@@ -98,6 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           border: Border.all(color: const Color(0xFFE5E9F0), width: 2),
                         ),
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(Icons.monetization_on_rounded, color: AppTheme.coinGold, size: 28),
                             const SizedBox(width: 8),
@@ -106,9 +134,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                      _buildIconButton(Icons.settings_rounded, AppTheme.textLight, () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())).then((_) => setState(() {}));
-                      }),
+                      // Avatar Profile Button
+                      GestureDetector(
+                        onTap: () => _navigateTo(const ProfileScreen()),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white, shape: BoxShape.circle, 
+                            border: Border.all(color: const Color(0xFFE5E9F0), width: 2),
+                            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
+                          ),
+                          child: Text(GameSettings.avatar, style: const TextStyle(fontSize: 26)),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -124,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       
                       GameButton(
                         title: 'PLAY LEVEL $currentLevel', icon: Icons.play_arrow_rounded, color: AppTheme.primary, shadowColor: AppTheme.primaryDark,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelSelectScreen())).then((_) => setState(() {})),
+                        onTap: () => _navigateTo(const LevelSelectScreen()),
                       ),
                       const SizedBox(height: 15),
                       GameButton(title: 'DAILY PUZZLE', icon: Icons.calendar_month_rounded, color: AppTheme.accent, shadowColor: AppTheme.accentDark, onTap: _playDailyPuzzle),
@@ -137,20 +175,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildIconButton(IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: () {
-        AudioManager.playClick();
-        onTap();
-      },
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))], border: Border.all(color: const Color(0xFFE5E9F0), width: 2)),
-        child: Icon(icon, color: color, size: 28),
       ),
     );
   }

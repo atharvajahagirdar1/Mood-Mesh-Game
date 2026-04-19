@@ -11,7 +11,9 @@ class LevelData {
     Random rand = Random(levelSeed + 1000); 
 
     int cols = 3, rows = 3;
-    if (forceDaily) { cols = 5; rows = 5; } else {
+    if (forceDaily) { 
+      cols = 5; rows = 5; 
+    } else {
       if (levelSeed > 10) { cols = 4; rows = 4; }
       if (levelSeed > 50) { cols = 5; rows = 5; }
       if (levelSeed > 120) { cols = 6; rows = 6; }
@@ -23,7 +25,7 @@ class LevelData {
     int baseMoves = forceDaily ? 8 : 2 + (chapter * 0.7).toInt(); 
     List<int> sawtooth = [0, 1, 1, 2, 2, 3, 4, 5, 6, -1]; 
     int requiredMoves = baseMoves + sawtooth[levelInChapter];
-    if (requiredMoves < 1) requiredMoves = 1;
+    if (requiredMoves < 1) { requiredMoves = 1; }
 
     List<int> grid = List.filled(cols * rows, 0);
 
@@ -33,9 +35,9 @@ class LevelData {
 
       List<int> happyDots = [];
       for (int i = 0; i < grid.length; i++) {
-        if (grid[i] == 0) happyDots.add(i);
+        if (grid[i] == 0) { happyDots.add(i); }
       }
-      if (happyDots.isEmpty) break; 
+      if (happyDots.isEmpty) { break; } 
       
       int startDot = happyDots[rand.nextInt(happyDots.length)];
       path.add(startDot);
@@ -44,10 +46,10 @@ class LevelData {
         int r = startDot ~/ cols;
         int c = startDot % cols;
         List<int> neighbors = [];
-        if (r > 0) neighbors.add(startDot - cols);
-        if (r < rows - 1) neighbors.add(startDot + cols);
-        if (c > 0) neighbors.add(startDot - 1);
-        if (c < cols - 1) neighbors.add(startDot + 1);
+        if (r > 0) { neighbors.add(startDot - cols); }
+        if (r < rows - 1) { neighbors.add(startDot + cols); }
+        if (c > 0) { neighbors.add(startDot - 1); }
+        if (c < cols - 1) { neighbors.add(startDot + 1); }
 
         List<int> happyNeighbors = neighbors.where((n) => grid[n] == 0).toList();
         if (happyNeighbors.isNotEmpty) { path.add(happyNeighbors[rand.nextInt(happyNeighbors.length)]); }
@@ -64,7 +66,7 @@ class LevelData {
           int nr = r + d[0], nc = c + d[1];
           if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
             int nIdx = nr * cols + nc;
-            if (!pathSet.contains(nIdx)) neighborsToChange.add(nIdx);
+            if (!pathSet.contains(nIdx)) { neighborsToChange.add(nIdx); }
           }
         }
       }
@@ -88,15 +90,15 @@ class LevelData {
   }
 
   static void unlockNextLevel(int currentLevelId) {
-    if (currentLevelId == maxUnlockedLevel && currentLevelId < allLevels.length) maxUnlockedLevel++;
+    if (currentLevelId == maxUnlockedLevel && currentLevelId < allLevels.length) { maxUnlockedLevel++; }
   }
 
   static void saveStars(int levelId, int stars) {
-    if (!levelStars.containsKey(levelId) || stars > levelStars[levelId]!) levelStars[levelId] = stars;
+    if (!levelStars.containsKey(levelId) || stars > levelStars[levelId]!) { levelStars[levelId] = stars; }
   }
 
   static Level getLevel(int id) {
-    if (id == 999) return dailyLevel;
+    if (id == 999) { return dailyLevel; }
     return allLevels.firstWhere((lvl) => lvl.id == id);
   }
 }

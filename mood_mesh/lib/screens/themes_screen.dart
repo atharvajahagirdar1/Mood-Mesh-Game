@@ -6,10 +6,10 @@ import '../core/audio_manager.dart';
 import '../widgets/animated_background.dart';
 
 class ThemesScreen extends StatefulWidget {
-  const ThemesScreen({Key? key}) : super(key: key);
+  const ThemesScreen({super.key});
 
   @override
-  _ThemesScreenState createState() => _ThemesScreenState();
+  State<ThemesScreen> createState() => _ThemesScreenState();
 }
 
 class _ThemesScreenState extends State<ThemesScreen> {

@@ -8,10 +8,10 @@ import '../core/audio_manager.dart';
 import '../widgets/animated_background.dart';
 
 class LevelSelectScreen extends StatefulWidget {
-  const LevelSelectScreen({Key? key}) : super(key: key);
+  const LevelSelectScreen({super.key});
 
   @override
-  _LevelSelectScreenState createState() => _LevelSelectScreenState();
+  State<LevelSelectScreen> createState() => _LevelSelectScreenState();
 }
 
 class _LevelSelectScreenState extends State<LevelSelectScreen> {
@@ -36,9 +36,10 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
 
                   return GestureDetector(
                     onTap: isUnlocked ? () async {
-                      if (GameSettings.hapticsOn) HapticFeedback.lightImpact();
+                      if (GameSettings.hapticsOn) { HapticFeedback.lightImpact(); }
                       AudioManager.playClick();
                       await Navigator.push(context, MaterialPageRoute(builder: (_) => GameScreen(level: level, isDaily: false)));
+                      if (!mounted) { return; }
                       setState(() {}); 
                     } : null,
                     child: Container(

@@ -16,10 +16,10 @@ import 'game_over_screen.dart';
 class GameScreen extends StatefulWidget {
   final Level level;
   final bool isDaily;
-  const GameScreen({Key? key, required this.level, this.isDaily = false}) : super(key: key);
+  const GameScreen({super.key, required this.level, this.isDaily = false});
 
   @override
-  _GameScreenState createState() => _GameScreenState();
+  State<GameScreen> createState() => _GameScreenState();
 }
 
 class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateMixin {
@@ -61,7 +61,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       if (grid[i] == Mood.happy) {
         List<int> currentPath = [i];
         _dfsFindPath(i, currentPath, bestPath);
-        if (bestPath.length >= 3) break; 
+        if (bestPath.length >= 3) { break; } 
       }
     }
     
@@ -81,20 +81,22 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       if (nr >= 0 && nr < widget.level.rows && nc >= 0 && nc < widget.level.cols) {
         int nIdx = nr * widget.level.cols + nc;
         if (grid[nIdx] == Mood.happy && !currentPath.contains(nIdx)) {
-          currentPath.add(nIdx); _dfsFindPath(nIdx, currentPath, bestPath); currentPath.removeLast();
+          currentPath.add(nIdx); 
+          _dfsFindPath(nIdx, currentPath, bestPath); 
+          currentPath.removeLast();
         }
       }
     }
   }
 
   void _useHint() {
-    if (movesLeft <= 0 || isProcessing || isHintActive) return;
+    if (movesLeft <= 0 || isProcessing || isHintActive) { return; }
     if (GameSettings.availableHints > 0) {
       setState(() => GameSettings.availableHints--); _executeHint();
     } else if (GameSettings.totalCoins >= GameSettings.hintCost) {
       setState(() => GameSettings.totalCoins -= GameSettings.hintCost); _executeHint();
     } else {
-      if (GameSettings.hapticsOn) HapticFeedback.heavyImpact();
+      if (GameSettings.hapticsOn) { HapticFeedback.heavyImpact(); }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Not enough coins for a hint!', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: AppTheme.accent, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))));
     }
   }
@@ -102,7 +104,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
   void _triggerRipple() async {
     if (path.length <= 1) { setState(() => path.clear()); return; }
 
-    if (GameSettings.hapticsOn) HapticFeedback.mediumImpact();
+    if (GameSettings.hapticsOn) { HapticFeedback.mediumImpact(); }
     setState(() => isProcessing = true);
     
     Set<int> pathSet = path.toSet(); Set<int> neighborsToChange = {};
@@ -113,7 +115,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
         int nr = n[0], nc = n[1];
         if (nr >= 0 && nr < widget.level.rows && nc >= 0 && nc < widget.level.cols) {
           int nIdx = nr * widget.level.cols + nc;
-          if (!pathSet.contains(nIdx)) neighborsToChange.add(nIdx);
+          if (!pathSet.contains(nIdx)) { neighborsToChange.add(nIdx); }
         }
       }
     }
@@ -121,9 +123,13 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     await Future.delayed(const Duration(milliseconds: 150));
     setState(() {
       for (int nIdx in neighborsToChange) {
-        if (grid[nIdx] == Mood.happy) grid[nIdx] = Mood.angry;
-        else if (grid[nIdx] == Mood.angry) grid[nIdx] = Mood.sleepy;
-        else grid[nIdx] = Mood.happy;
+        if (grid[nIdx] == Mood.happy) {
+          grid[nIdx] = Mood.angry;
+        } else if (grid[nIdx] == Mood.angry) {
+          grid[nIdx] = Mood.sleepy;
+        } else {
+          grid[nIdx] = Mood.happy;
+        }
       }
       movesLeft--; path.clear(); isProcessing = false; _checkWinLoss();
     });
@@ -134,7 +140,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     if (isWin) {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LevelCompleteScreen(level: widget.level, movesLeft: movesLeft, isDaily: widget.isDaily)));
     } else if (movesLeft <= 0) {
-      if (GameSettings.hapticsOn) HapticFeedback.heavyImpact();
+      if (GameSettings.hapticsOn) { HapticFeedback.heavyImpact(); }
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameOverScreen(level: widget.level, isDaily: widget.isDaily)));
     }
   }
@@ -145,16 +151,20 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
   }
 
   void _handlePanUpdate(Offset localPosition, Size boardSize) {
-    if (isProcessing) return;
+    if (isProcessing) { return; }
     double cellWidth = boardSize.width / widget.level.cols; double cellHeight = boardSize.height / widget.level.rows;
     int c = (localPosition.dx / cellWidth).floor(); int r = (localPosition.dy / cellHeight).floor();
-    if (c < 0 || c >= widget.level.cols || r < 0 || r >= widget.level.rows) return;
+    if (c < 0 || c >= widget.level.cols || r < 0 || r >= widget.level.rows) { return; }
     int idx = r * widget.level.cols + c;
+    
+    // 🚀 FIX: Prevent massive frame dropping / lag! 
+    // If the user's finger is still moving inside the same dot, don't do anything!
+    if (path.isNotEmpty && path.last == idx) { return; }
 
     if (path.isEmpty) {
       if (grid[idx] == Mood.happy) {
         setState(() => path.add(idx));
-        if (GameSettings.hapticsOn) HapticFeedback.selectionClick();
+        if (GameSettings.hapticsOn) { HapticFeedback.selectionClick(); }
         AudioManager.playPop(); 
       }
       return;
@@ -162,7 +172,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
 
     if (path.length > 1 && path[path.length - 2] == idx) {
       setState(() => path.removeLast());
-      if (GameSettings.hapticsOn) HapticFeedback.selectionClick();
+      if (GameSettings.hapticsOn) { HapticFeedback.selectionClick(); }
       return;
     }
 
@@ -172,7 +182,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
 
       if (isAdjacent && grid[idx] == Mood.happy) {
         setState(() => path.add(idx));
-        if (GameSettings.hapticsOn) HapticFeedback.selectionClick();
+        if (GameSettings.hapticsOn) { HapticFeedback.selectionClick(); }
         AudioManager.playPop(); 
       }
     }

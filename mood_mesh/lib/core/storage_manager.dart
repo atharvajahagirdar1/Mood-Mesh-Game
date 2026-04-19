@@ -11,6 +11,13 @@ class StorageManager {
   }
 
   static void _loadData() {
+    GameSettings.isFirstTime = _prefs.getBool('is_first_time') ?? true;
+    GameSettings.isAgeVerified = _prefs.getBool('is_age_verified') ?? false;
+    GameSettings.playerAge = _prefs.getInt('player_age') ?? 0;
+    GameSettings.playerName = _prefs.getString('player_name') ?? 'Player';
+    GameSettings.avatar = _prefs.getString('avatar') ?? '😊';
+    GameSettings.dailyPuzzlesSolved = _prefs.getInt('daily_solved') ?? 0;
+
     GameSettings.totalCoins = _prefs.getInt('coins') ?? 0;
     GameSettings.availableHints = _prefs.getInt('hints') ?? 5;
     GameSettings.currentTheme = _prefs.getString('theme') ?? 'classic';
@@ -22,7 +29,9 @@ class StorageManager {
 
     for (int i = 1; i <= 200; i++) {
       int? stars = _prefs.getInt('stars_$i');
-      if (stars != null) LevelData.levelStars[i] = stars;
+      if (stars != null) {
+        LevelData.levelStars[i] = stars;
+      }
     }
   }
 
@@ -37,6 +46,15 @@ class StorageManager {
     await _prefs.setInt('coins', GameSettings.totalCoins);
     await _prefs.setInt('hints', GameSettings.availableHints);
     await _prefs.setString('last_daily', GameSettings.lastDailyPuzzleDate);
+    await _prefs.setInt('daily_solved', GameSettings.dailyPuzzlesSolved);
+  }
+
+  static Future<void> saveProfile() async {
+    await _prefs.setBool('is_first_time', GameSettings.isFirstTime);
+    await _prefs.setBool('is_age_verified', GameSettings.isAgeVerified);
+    await _prefs.setInt('player_age', GameSettings.playerAge);
+    await _prefs.setString('player_name', GameSettings.playerName);
+    await _prefs.setString('avatar', GameSettings.avatar);
   }
 
   static Future<void> saveProgress(int levelId, int stars) async {

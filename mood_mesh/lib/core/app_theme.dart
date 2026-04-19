@@ -26,7 +26,6 @@ class AppTheme {
   static const Color textLight = Color(0xFF748A9D);
   static const Color white = Colors.white;
 
-  // New High-Contrast Requested Colors
   static const Color moodHappy = Color(0xFFFFEA00); 
   static const Color moodAngry = Color(0xFFFF3D00); 
   static const Color moodSleepy = Color(0xFF00E5FF); 

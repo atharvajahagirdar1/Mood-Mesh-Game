@@ -66,7 +66,7 @@ class AdManager {
 }
 
 class BannerAdWidget extends StatefulWidget {
-  const BannerAdWidget({Key? key}) : super(key: key);
+  const BannerAdWidget({super.key});
   @override
   State<BannerAdWidget> createState() => _BannerAdWidgetState();
 }
@@ -91,9 +91,10 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (_) {
-          if (mounted) setState(() => _isLoaded = true);
+          if (mounted) { setState(() => _isLoaded = true); }
         },
         onAdFailedToLoad: (ad, error) {
+          debugPrint('BannerAd failed to load: $error');
           ad.dispose();
         },
       ),

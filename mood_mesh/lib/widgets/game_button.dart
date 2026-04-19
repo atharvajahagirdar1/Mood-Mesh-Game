@@ -12,11 +12,11 @@ class GameButton extends StatefulWidget {
   final bool isSmall;
 
   const GameButton({
-    Key? key, required this.title, required this.color, required this.shadowColor, required this.onTap, this.icon, this.isSmall = false,
-  }) : super(key: key);
+    super.key, required this.title, required this.color, required this.shadowColor, required this.onTap, this.icon, this.isSmall = false,
+  });
 
   @override
-  _GameButtonState createState() => _GameButtonState();
+  State<GameButton> createState() => _GameButtonState();
 }
 
 class _GameButtonState extends State<GameButton> with SingleTickerProviderStateMixin {
@@ -34,7 +34,7 @@ class _GameButtonState extends State<GameButton> with SingleTickerProviderStateM
   void dispose() { _controller.dispose(); super.dispose(); }
 
   void _onTapDown(TapDownDetails details) {
-    if (GameSettings.hapticsOn) HapticFeedback.lightImpact();
+    if (GameSettings.hapticsOn) { HapticFeedback.lightImpact(); }
     AudioManager.playClick();
     _controller.forward();
   }
@@ -73,10 +73,10 @@ class GameIconButton extends StatefulWidget {
   final Color shadowColor;
   final VoidCallback onTap;
 
-  const GameIconButton({Key? key, required this.icon, required this.color, required this.shadowColor, required this.onTap}) : super(key: key);
+  const GameIconButton({super.key, required this.icon, required this.color, required this.shadowColor, required this.onTap});
 
   @override
-  _GameIconButtonState createState() => _GameIconButtonState();
+  State<GameIconButton> createState() => _GameIconButtonState();
 }
 
 class _GameIconButtonState extends State<GameIconButton> with SingleTickerProviderStateMixin {
@@ -94,7 +94,7 @@ class _GameIconButtonState extends State<GameIconButton> with SingleTickerProvid
   void dispose() { _controller.dispose(); super.dispose(); }
 
   void _onTapDown(TapDownDetails details) {
-    if (GameSettings.hapticsOn) HapticFeedback.lightImpact();
+    if (GameSettings.hapticsOn) { HapticFeedback.lightImpact(); }
     AudioManager.playClick();
     _controller.forward();
   }

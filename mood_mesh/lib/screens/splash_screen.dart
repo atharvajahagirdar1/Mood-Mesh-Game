@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
+import 'onboarding_screen.dart';
+import 'age_gate_screen.dart';
 import '../core/app_theme.dart';
+import '../core/game_settings.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/game_logo.dart';
 import '../core/audio_manager.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  const SplashScreen({super.key});
 
   @override
-  _SplashScreenState createState() => _SplashScreenState();
+  State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
@@ -26,7 +29,17 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     AudioManager.playBgm();
     
     Future.delayed(const Duration(milliseconds: 2500), () {
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+      if (mounted) {
+        if (!GameSettings.isAgeVerified) {
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const AgeGateScreen()));
+        } 
+        else if (GameSettings.isFirstTime) {
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const OnboardingScreen()));
+        } 
+        else {
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+        }
+      }
     });
   }
 
@@ -42,9 +55,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           Center(
             child: ScaleTransition(
               scale: _scaleAnimation,
-              child: Column(
+              child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
+                children: [
                   GameLogoWidget(size: 260), 
                   SizedBox(height: 30),
                   Text('Mood Mesh', style: TextStyle(fontSize: 46, fontWeight: FontWeight.w900, color: AppTheme.textDark, letterSpacing: 2.0)),

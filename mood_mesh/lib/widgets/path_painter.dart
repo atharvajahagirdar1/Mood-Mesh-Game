@@ -6,18 +6,18 @@ class PathPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (path.length < 2) return;
+    if (path.length < 2) { return; }
     double cellWidth = size.width / cols; double cellHeight = size.height / rows;
     Path fullPath = Path();
     for (int i = 0; i < path.length - 1; i++) {
       int p1 = path[i]; int p2 = path[i + 1];
       Offset start = Offset((p1 % cols) * cellWidth + cellWidth / 2, (p1 ~/ cols) * cellHeight + cellHeight / 2);
       Offset end = Offset((p2 % cols) * cellWidth + cellWidth / 2, (p2 ~/ cols) * cellHeight + cellHeight / 2);
-      if (i == 0) fullPath.moveTo(start.dx, start.dy);
+      if (i == 0) { fullPath.moveTo(start.dx, start.dy); }
       fullPath.lineTo(end.dx, end.dy);
     }
     if (isNeon) {
-      final glowPaint = Paint()..color = pathColor.withOpacity(0.4 + (pulseValue * 0.6))..strokeWidth = strokeWidth * 1.5..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round..style = PaintingStyle.stroke..maskFilter = MaskFilter.blur(BlurStyle.normal, 10 + (pulseValue * 10));
+      final glowPaint = Paint()..color = pathColor.withValues(alpha: 0.4 + (pulseValue * 0.6))..strokeWidth = strokeWidth * 1.5..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round..style = PaintingStyle.stroke..maskFilter = MaskFilter.blur(BlurStyle.normal, 10 + (pulseValue * 10));
       canvas.drawPath(fullPath, glowPaint);
       final corePaint = Paint()..color = Colors.white..strokeWidth = strokeWidth * 0.4..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round..style = PaintingStyle.stroke;
       canvas.drawPath(fullPath, corePaint);

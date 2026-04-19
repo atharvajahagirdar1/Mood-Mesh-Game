@@ -16,10 +16,10 @@ class LevelCompleteScreen extends StatefulWidget {
   final Level level;
   final int movesLeft;
   final bool isDaily;
-  const LevelCompleteScreen({Key? key, required this.level, required this.movesLeft, required this.isDaily}) : super(key: key);
+  const LevelCompleteScreen({super.key, required this.level, required this.movesLeft, required this.isDaily});
 
   @override
-  _LevelCompleteScreenState createState() => _LevelCompleteScreenState();
+  State<LevelCompleteScreen> createState() => _LevelCompleteScreenState();
 }
 
 class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
@@ -43,9 +43,13 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
     
     if (!widget.isDaily && widget.level.id < LevelData.maxUnlockedLevel) { isReplay = true; }
 
-    if (widget.movesLeft >= widget.level.movesFor3Stars) { targetStars = 3; coinsEarned = isReplay ? 0 : 30; } 
-    else if (widget.movesLeft >= widget.level.movesFor2Stars) { targetStars = 2; coinsEarned = isReplay ? 0 : 20; } 
-    else { targetStars = 1; coinsEarned = isReplay ? 0 : 10; }
+    if (widget.movesLeft >= widget.level.movesFor3Stars) { 
+      targetStars = 3; coinsEarned = isReplay ? 0 : 30; 
+    } else if (widget.movesLeft >= widget.level.movesFor2Stars) { 
+      targetStars = 2; coinsEarned = isReplay ? 0 : 20; 
+    } else { 
+      targetStars = 1; coinsEarned = isReplay ? 0 : 10; 
+    }
     
     if (!isReplay && !widget.isDaily) {
       GameSettings.totalCoins += coinsEarned;
@@ -69,11 +73,11 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
 
   void _animateStars() async {
     await Future.delayed(const Duration(milliseconds: 300));
-    if (mounted && targetStars >= 1) setState(() => _star1Scale = 1.0);
+    if (mounted && targetStars >= 1) { setState(() => _star1Scale = 1.0); }
     await Future.delayed(const Duration(milliseconds: 400));
-    if (mounted && targetStars >= 2) setState(() => _star2Scale = 1.0);
+    if (mounted && targetStars >= 2) { setState(() => _star2Scale = 1.0); }
     await Future.delayed(const Duration(milliseconds: 400));
-    if (mounted && targetStars >= 3) setState(() => _star3Scale = 1.0);
+    if (mounted && targetStars >= 3) { setState(() => _star3Scale = 1.0); }
   }
   
   void _onNextOrHome(bool isNext) {
@@ -116,9 +120,9 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    AnimatedScale(scale: _star1Scale, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: Icon(Icons.star_rounded, size: 70, color: AppTheme.primary)),
-                    Padding(padding: const EdgeInsets.only(bottom: 40.0, left: 10, right: 10), child: AnimatedScale(scale: _star2Scale, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: Icon(Icons.star_rounded, size: 90, color: AppTheme.primary))),
-                    AnimatedScale(scale: _star3Scale, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: Icon(Icons.star_rounded, size: 70, color: AppTheme.primary)),
+                    AnimatedScale(scale: _star1Scale, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: const Icon(Icons.star_rounded, size: 70, color: AppTheme.primary)),
+                    Padding(padding: const EdgeInsets.only(bottom: 40.0, left: 10, right: 10), child: AnimatedScale(scale: _star2Scale, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: const Icon(Icons.star_rounded, size: 90, color: AppTheme.primary))),
+                    AnimatedScale(scale: _star3Scale, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: const Icon(Icons.star_rounded, size: 70, color: AppTheme.primary)),
                   ],
                 ),
                 const SizedBox(height: 20),

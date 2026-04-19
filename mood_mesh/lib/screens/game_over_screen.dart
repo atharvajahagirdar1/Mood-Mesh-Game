@@ -12,7 +12,7 @@ import '../widgets/animated_background.dart';
 class GameOverScreen extends StatefulWidget {
   final Level level;
   final bool isDaily;
-  const GameOverScreen({Key? key, required this.level, required this.isDaily}) : super(key: key);
+  const GameOverScreen({super.key, required this.level, required this.isDaily});
 
   @override
   State<GameOverScreen> createState() => _GameOverScreenState();
