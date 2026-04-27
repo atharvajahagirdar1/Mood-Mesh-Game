@@ -12,10 +12,10 @@ class AdManager {
   InterstitialAd? _interstitialAd;
   bool isInterstitialLoaded = false;
 
-  final String _androidRewardedId = 'ca-app-pub-3940256099942544/5224354917';
+  final String _androidRewardedId = 'ca-app-pub-2405291381532452/8391531494';
   final String _iosRewardedId = 'ca-app-pub-3940256099942544/1712485313';
   
-  final String _androidInterstitialId = 'ca-app-pub-3940256099942544/1033173712';
+  final String _androidInterstitialId = 'ca-app-pub-2405291381532452/2867742077';
   final String _iosInterstitialId = 'ca-app-pub-3940256099942544/4411468910';
 
   void loadRewardedAd() {
@@ -75,7 +75,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
   BannerAd? _bannerAd;
   bool _isLoaded = false;
 
-  final String _androidBannerId = 'ca-app-pub-3940256099942544/6300978111';
+  final String _androidBannerId = 'ca-app-pub-2405291381532452/3853520687';
   final String _iosBannerId = 'ca-app-pub-3940256099942544/2934735716';
 
   @override
