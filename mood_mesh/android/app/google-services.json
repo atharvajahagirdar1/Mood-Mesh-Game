@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "773984730422",
+    "project_id": "mood-mesh-c9b03",
+    "storage_bucket": "mood-mesh-c9b03.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:773984730422:android:750b506afa68064dc48797",
+        "android_client_info": {
+          "package_name": "com.altronixsoftech.moodmesh"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2vE9F9Cj5yTjzKD_BFV-q8oEDFqSgmWM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

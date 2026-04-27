@@ -138,6 +138,13 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
   void _checkWinLoss() {
     bool isWin = grid.every((mood) => mood == Mood.happy);
     if (isWin) {
+      // 🚀 THE FIX: Correctly track and save Daily Puzzle progress!
+      if (widget.isDaily) {
+        GameSettings.lastDailyPuzzleDate = DateTime.now().toIso8601String().split('T')[0];
+        GameSettings.dailyPuzzlesSolved += 1;
+        StorageManager.saveEconomy();
+      }
+      
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LevelCompleteScreen(level: widget.level, movesLeft: movesLeft, isDaily: widget.isDaily)));
     } else if (movesLeft <= 0) {
       if (GameSettings.hapticsOn) { HapticFeedback.heavyImpact(); }

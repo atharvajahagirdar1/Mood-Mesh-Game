@@ -17,8 +17,14 @@ class GameSettings {
   static String lastDailyPuzzleDate = ''; 
 
   static String getEmoji(int moodIndex) {
+
     if (currentTheme == 'animals') { return ['🐶', '🐯', '🐨'][moodIndex]; }
     if (currentTheme == 'fruits') { return ['🍎', '🌶️', '🍇'][moodIndex]; }
+    if (currentTheme == 'space') { return ['👽', '👾', '🚀'][moodIndex]; }
+    if (currentTheme == 'ocean') { return ['🐠', '🐡', '🐙'][moodIndex]; }
+    if (currentTheme == 'spooky') { return ['🎃', '👻', '💀'][moodIndex]; }
+    // Default classic fallback
     return ['😊', '😡', '😴'][moodIndex];
   }
+  
 }

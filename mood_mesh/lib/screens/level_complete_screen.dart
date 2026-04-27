@@ -9,6 +9,7 @@ import '../core/game_settings.dart';
 import '../core/storage_manager.dart';
 import '../core/audio_manager.dart';
 import '../core/ad_manager.dart';
+import '../core/review_manager.dart'; // 🚀 NEW: IMPORT REVIEW MANAGER
 import '../widgets/game_button.dart';
 import '../widgets/animated_background.dart';
 
@@ -77,7 +78,16 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
     await Future.delayed(const Duration(milliseconds: 400));
     if (mounted && targetStars >= 2) { setState(() => _star2Scale = 1.0); }
     await Future.delayed(const Duration(milliseconds: 400));
-    if (mounted && targetStars >= 3) { setState(() => _star3Scale = 1.0); }
+    if (mounted && targetStars >= 3) { 
+      setState(() => _star3Scale = 1.0); 
+      
+      // 🚀 GOLDEN RULE: Ask for a review right when they 3-star Level 10!
+      if (!isReplay && widget.level.id == 10) {
+        Future.delayed(const Duration(seconds: 1), () {
+          ReviewManager.triggerReview();
+        });
+      }
+    }
   }
   
   void _onNextOrHome(bool isNext) {
@@ -95,6 +105,23 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
     } else {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
     }
+  }
+
+  // 🚀 REWARD AD LOGIC FOR REPLAY BUTTON
+  void _onReplay() {
+    if (AdManager.instance.isAdLoaded) {
+      AdManager.instance.showRewardedAd(() {
+        // Give them a secret bonus +10 coins for watching the ad on replay!
+        GameSettings.totalCoins += 10;
+        StorageManager.saveEconomy();
+      });
+    } else {
+      // Fallback: If a rewarded ad isn't loaded, try to show an interstitial ad instead
+      AdManager.instance.showInterstitialIfReady();
+    }
+    
+    // Smoothly load the Game Screen in the background while the Ad is playing
+    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily)));
   }
 
   @override
@@ -148,7 +175,7 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen> {
                   children: [
                     GameButton(title: 'HOME', icon: Icons.home_rounded, color: AppTheme.secondary, shadowColor: AppTheme.secondaryDark, isSmall: true, onTap: () => _onNextOrHome(false)),
                     const SizedBox(width: 15),
-                    if (!widget.isDaily) GameButton(title: 'REPLAY', icon: Icons.replay_rounded, color: AppTheme.primary, shadowColor: AppTheme.primaryDark, isSmall: true, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen(level: widget.level, isDaily: widget.isDaily)))),
+                    if (!widget.isDaily) GameButton(title: 'REPLAY', icon: Icons.replay_rounded, color: AppTheme.primary, shadowColor: AppTheme.primaryDark, isSmall: true, onTap: _onReplay),
                   ],
                 )
               ],

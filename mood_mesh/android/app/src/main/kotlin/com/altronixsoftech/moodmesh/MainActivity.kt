@@ -1,4 +1,4 @@
-package com.example.mood_mesh
+package com.altronixsoftech.moodmesh
 
 import io.flutter.embedding.android.FlutterActivity
 

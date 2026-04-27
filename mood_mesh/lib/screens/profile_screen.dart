@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/app_theme.dart';
 import '../core/game_settings.dart';
@@ -15,9 +17,57 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  // List to track which rewards the player has already claimed
+  List<String> claimedAchievements = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadClaimedAchievements();
+  }
+
+  // Load claimed data securely from device storage
+  Future<void> _loadClaimedAchievements() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      claimedAchievements = prefs.getStringList('claimedAchievements') ?? [];
+    });
+  }
+
+  // Logic to actually give the player their coins and hints!
+  Future<void> _claimReward(String id, int coins, int hints) async {
+    AudioManager.playClick();
+    if (GameSettings.hapticsOn) HapticFeedback.heavyImpact();
+
+    setState(() {
+      // Add the rewards
+      GameSettings.totalCoins += coins;
+      GameSettings.availableHints += hints;
+      // Mark as claimed so they can't spam the button
+      claimedAchievements.add(id);
+    });
+
+    // Save the new economy stats and the claimed badge list
+    StorageManager.saveEconomy();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('claimedAchievements', claimedAchievements);
+
+    // Show a happy message!
+    if (mounted) {
+      String rewardText = coins > 0 ? '+$coins Coins!' : '+$hints Hints!';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Reward Claimed: $rewardText', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          backgroundColor: AppTheme.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        )
+      );
+    }
+  }
 
   Future<void> _launchPrivacyPolicy() async {
-    final Uri url = Uri.parse('https://policies.google.com/privacy'); 
+    final Uri url = Uri.parse('https://sites.google.com/view/moodmeshprivacypolicy/home'); 
     if (!await launchUrl(url)) {
       if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not launch Privacy Policy'))); }
     }
@@ -27,9 +77,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     int totalStars = LevelData.levelStars.values.fold(0, (sum, stars) => sum + stars);
     int levelsCleared = LevelData.maxUnlockedLevel > 1 ? LevelData.maxUnlockedLevel - 1 : 0;
-    
-    bool isNovice = levelsCleared >= 10;
-    bool isMaster = totalStars >= 100;
+    int perfectLevels = LevelData.levelStars.values.where((stars) => stars == 3).length;
+    int dailies = GameSettings.dailyPuzzlesSolved;
+    int coins = GameSettings.totalCoins;
+    int hints = GameSettings.availableHints;
+
+    String today = DateTime.now().toIso8601String().split('T')[0];
+    bool isDailySolvedToday = GameSettings.lastDailyPuzzleDate == today;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -56,7 +110,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       return Transform.scale(
                         scale: val,
                         child: Opacity(
-                          opacity: val.clamp(0.0, 1.0), // 🚀 FIX: Clamp prevents the Red Screen crash!
+                          opacity: val.clamp(0.0, 1.0),
                           child: Column(
                             children: [
                               Container(
@@ -89,21 +143,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                   const SizedBox(height: 15),
-                  _buildStatCard('Daily Puzzles Solved', '${GameSettings.dailyPuzzlesSolved}', Icons.calendar_month_rounded, AppTheme.secondary, isFullWidth: true),
-                  
-                  const SizedBox(height: 30),
-                  
-                  // Achievements
-                  _buildSectionTitle('Achievements'),
+                  Row(
+                    children: [
+                      Expanded(child: _buildStatCard('Perfect Levels', '$perfectLevels', Icons.diamond_rounded, AppTheme.neonBlue)),
+                      const SizedBox(width: 15),
+                      Expanded(child: _buildStatCard('Total Dailies', '$dailies', Icons.calendar_month_rounded, AppTheme.secondary)),
+                    ],
+                  ),
                   const SizedBox(height: 15),
                   Row(
                     children: [
-                      Expanded(child: _buildBadge('Novice', 'Clear 10 Levels', '🌱', isNovice)),
+                      Expanded(child: _buildStatCard("Today's Daily", isDailySolvedToday ? 'Solved' : 'Pending', isDailySolvedToday ? Icons.check_circle_rounded : Icons.help_outline_rounded, isDailySolvedToday ? AppTheme.success : AppTheme.accent)),
                       const SizedBox(width: 15),
-                      Expanded(child: _buildBadge('Master', 'Collect 100 Stars', '👑', isMaster)),
+                      Expanded(child: _buildStatCard('Hints Left', '$hints', Icons.lightbulb_rounded, AppTheme.primary)),
                     ],
                   ),
                   
+                  const SizedBox(height: 40),
+                  
+                  // --- ACHIEVEMENTS ---
+                  
+                  // TRACK 1: THE JOURNEY (Levels)
+                  _buildSectionTitle('The Journey (Progression)'),
+                  const SizedBox(height: 15),
+                  _buildProgressBadge('prog_journey_10', 'Novice', 'Clear 10 Levels', '🌱', levelsCleared, 10, 50, 0),
+                  _buildProgressBadge('prog_journey_50', 'Champion', 'Clear 50 Levels', '🏆', levelsCleared, 50, 200, 0),
+                  _buildProgressBadge('prog_journey_100', 'Legend', 'Clear 100 Levels', '🏅', levelsCleared, 100, 500, 0),
+                  _buildProgressBadge('prog_journey_200', 'Grandmaster', 'Clear 200 Levels', '🌌', levelsCleared, 200, 1000, 0),
+                  
+                  const SizedBox(height: 30),
+
+                  // TRACK 2: MASTERY (Stars & Flawless)
+                  _buildSectionTitle('Mastery (Skill)'),
+                  const SizedBox(height: 15),
+                  _buildProgressBadge('prog_master_100', 'Master', 'Collect 100 Stars', '⭐', totalStars, 100, 0, 5),
+                  _buildProgressBadge('prog_master_300', 'Superstar', 'Collect 300 Stars', '🌟', totalStars, 300, 0, 15),
+                  _buildProgressBadge('prog_flawless_50', 'Flawless', 'Fifty 3-Star Levels', '✨', perfectLevels, 50, 1000, 0),
+
+                  const SizedBox(height: 30),
+
+                  // TRACK 3: DEDICATION & ECONOMY (Habits)
+                  _buildSectionTitle('Dedication (Habits)'),
+                  const SizedBox(height: 15),
+                  _buildProgressBadge('prog_habit_7', 'Dedicated', '7 Daily Puzzles', '📅', dailies, 7, 100, 0),
+                  _buildProgressBadge('prog_habit_30', 'Scholar', '30 Daily Puzzles', '📚', dailies, 30, 500, 0),
+                  _buildProgressBadge('prog_eco_20', 'Brainiac', 'Save 20 Hints', '🧠', hints, 20, 500, 0),
+                  _buildProgressBadge('prog_eco_500', 'Tycoon', 'Hoard 500 Coins', '💰', coins, 500, 0, 10),
+                  _buildProgressBadge('prog_eco_1000', 'Hoarder', 'Hoard 1,000 Coins', '🐉', coins, 1000, 0, 25),
+
                   const SizedBox(height: 40),
                   
                   // Settings
@@ -162,47 +249,110 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color, {bool isFullWidth = false}) {
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
       decoration: AppTheme.gameBoxDecoration,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: isFullWidth ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            mainAxisAlignment: isFullWidth ? MainAxisAlignment.start : MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 28),
-              if (isFullWidth) const SizedBox(width: 10),
-              if (isFullWidth) Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textLight)),
-            ],
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            title, 
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textLight), 
+            textAlign: TextAlign.center, 
+            maxLines: 1, 
+            overflow: TextOverflow.ellipsis
           ),
-          SizedBox(height: isFullWidth ? 5 : 10),
-          if (!isFullWidth) Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textLight), textAlign: TextAlign.center),
-          if (!isFullWidth) const SizedBox(height: 5),
-          Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: color)),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: color)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildBadge(String title, String desc, String emoji, bool isUnlocked) {
+  // UPDATED: Completely rewritten logic to guarantee the Claim Button shows properly!
+  Widget _buildProgressBadge(String id, String title, String desc, String emoji, int current, int target, int coinReward, int hintReward) {
+    bool isUnlocked = current >= target;
+    bool isClaimed = claimedAchievements.contains(id);
+    double progressPercent = (current / target).clamp(0.0, 1.0);
+    
+    String rewardDisplay = coinReward > 0 ? '+$coinReward 🪙' : '+$hintReward 💡';
+
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isUnlocked ? Colors.white : AppTheme.backgroundDark,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: isUnlocked ? AppTheme.primary : const Color(0xFFE5E9F0), width: 2),
-        boxShadow: isUnlocked ? const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 5))] : [],
+        color: isClaimed ? Colors.grey.shade50 : (isUnlocked ? Colors.white : AppTheme.backgroundDark.withAlpha(128)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isClaimed ? Colors.grey.shade300 : (isUnlocked ? AppTheme.primary : const Color(0xFFE5E9F0)), width: 2),
+        boxShadow: (isUnlocked && !isClaimed) ? const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))] : [],
       ),
-      child: Column(
+      child: Row(
         children: [
-          Text(emoji, style: TextStyle(fontSize: 40, color: isUnlocked ? null : Colors.black26)),
-          const SizedBox(height: 10),
-          Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isUnlocked ? AppTheme.textDark : Colors.black38)),
-          const SizedBox(height: 5),
-          Text(desc, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isUnlocked ? AppTheme.textLight : Colors.black26)),
+          Container(
+            height: 60, width: 60,
+            decoration: BoxDecoration(
+              color: isUnlocked ? AppTheme.backgroundDark : Colors.grey.shade200,
+              shape: BoxShape.circle,
+            ),
+            child: Center(child: Text(emoji, style: TextStyle(fontSize: 32, color: isUnlocked ? null : Colors.black26))),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isUnlocked ? AppTheme.textDark : Colors.black38)),
+                    if (!isUnlocked) Text('${(progressPercent * 100).toInt()}%', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textLight)),
+                    if (isClaimed) const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 24),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(desc, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isUnlocked ? AppTheme.textLight : Colors.black26)),
+                const SizedBox(height: 10),
+                
+                // Progress Bar (Always visible, changes to grey when claimed)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    value: isClaimed ? 1.0 : progressPercent,
+                    minHeight: 8,
+                    backgroundColor: Colors.grey.shade200,
+                    valueColor: AlwaysStoppedAnimation<Color>(isClaimed ? Colors.grey.shade400 : (isUnlocked ? AppTheme.success : AppTheme.primary)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // THE CLAIM BUTTON LOGIC
+                if (isClaimed)
+                  Text('Claimed: $rewardDisplay', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey))
+                else if (isUnlocked && !isClaimed)
+                  GestureDetector(
+                    onTap: () => _claimReward(id, coinReward, hintReward),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.success,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))]
+                      ),
+                      child: Text('CLAIM $rewardDisplay!', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5)),
+                    ),
+                  )
+                else
+                  Text('Reward: $rewardDisplay', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryDark)),
+              ],
+            ),
+          ),
         ],
       ),
     );
