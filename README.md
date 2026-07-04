@@ -1,8 +1,6 @@
 # Mood-Mesh-Game
-<img width="257" height="558" alt="Screenshot 2026-04-11 183030" src="https://github.com/user-attachments/assets/4977c005-a999-4177-8c06-afe058aa01c8" />
-<img width="263" height="455" alt="Screenshot 2026-04-15 130306" src="https://github.com/user-attachments/assets/055201f8-6750-4279-b57b-75c10c951eae" />
-<img width="241" height="479" alt="Screenshot 2026-04-27 104932" src="https://github.com/user-attachments/assets/6d11d32e-c2b3-4f4c-b19c-9e6305f9975f" />
-<img width="272" height="475" alt="Screenshot 2026-04-27 105002" src="https://github.com/user-attachments/assets/88ff7d97-b109-4954-9a30-0a6538a5e75a" />
-<img width="248" height="280" alt="Screenshot 2026-04-27 113039" src="https://github.com/user-attachments/assets/a22722e6-816f-4e46-a2d6-9189562692c5" />
-<img width="244" height="554" alt="Screenshot 2026-04-27 124834" src="https://github.com/user-attachments/assets/0073d30b-8a39-485a-b757-bf49147c5f5a" />
-<img width="283" height="590" alt="Screenshot 2026-04-11 180453" src="https://github.com/user-attachments/assets/33247f76-7f00-486d-900d-9df28477eef6" />
+<img width="2048" height="2048" alt="App Logo" src="https://github.com/user-attachments/assets/51787c79-88f3-45f1-ad94-aaff6f33c7e5" />
+<img width="1339" height="2400" alt="screenshot 1 mobile" src="https://github.com/user-attachments/assets/82ba7d6c-9f82-45de-a550-72e8b8b1b102" />
+<img width="1340" height="2400" alt="screenshot 2 mobile" src="https://github.com/user-attachments/assets/0b612123-25c1-411a-a8bf-7d9c8f5f8915" />
+<img width="1340" height="2400" alt="screenshot 3 mobile" src="https://github.com/user-attachments/assets/b056cbfe-ac77-48f5-af7a-fee563332e5c" />
+<img width="1340" height="2400" alt="screenshot 4 mobile" src="https://github.com/user-attachments/assets/1df3c1dc-ea73-49d7-a841-870e67e13428" />
