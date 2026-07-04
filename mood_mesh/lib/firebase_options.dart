@@ -50,20 +50,20 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyB2vE9F9Cj5yTjzKD_BFV-q8oEDFqSgmWM',
-    appId: '1:773984730422:android:750b506afa68064dc48797',
-    messagingSenderId: '773984730422',
-    projectId: 'mood-mesh-c9b03',
-    storageBucket: 'mood-mesh-c9b03.firebasestorage.app',
+    apiKey: 'APIKEY',
+    appId: 'APPID',
+    messagingSenderId: '',
+    projectId: '',
+    storageBucket: '',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyD_awjDfnROqyAw_MxhXyI6ky3BuVTOn68',
-    appId: '1:773984730422:ios:1af26ad655212247c48797',
-    messagingSenderId: '773984730422',
-    projectId: 'mood-mesh-c9b03',
-    storageBucket: 'mood-mesh-c9b03.firebasestorage.app',
-    iosBundleId: 'com.altronixsoftech.moodmesh',
+    apiKey: '',
+    appId: '',
+    messagingSenderId: '',
+    projectId: '',
+    storageBucket: '',
+    iosBundleId: '',
   );
 
 }
